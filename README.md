@@ -215,6 +215,17 @@ python -m consent_gate.cli draft "Draft a mutual NDA with Northwind Labs..." \
 skips Foxit and hashes the HTML instead. Everything else — the audit, the gate,
 the ledger — is the real code path.
 
+To watch the whole thing, including both refusals, in one go:
+
+```bash
+python demo.py --offline --backend mock     # no credentials
+python demo.py                              # live Foxit, --draft-only, no email
+python demo.py --pause                      # step through it yourself
+```
+
+That script is what the demo video records. It shells out to the same CLI you
+would type — there is no separate demo path through the code.
+
 ### With credentials
 
 ```bash
