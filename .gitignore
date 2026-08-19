@@ -1,4 +1,5 @@
 workspace*/
+demo-workspace-*/
 .venv/
 __pycache__/
 *.pyc
