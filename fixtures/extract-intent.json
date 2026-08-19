@@ -1,0 +1,43 @@
+{
+  "doc_type": "mutual-nda",
+  "title": "Mutual Non-Disclosure Agreement",
+  "parties": [
+    {
+      "role": "sender",
+      "first_name": "Kazuma",
+      "last_name": "Sato",
+      "email": "sender@example.com",
+      "organisation": "Ai-Q Labs"
+    },
+    {
+      "role": "counterparty",
+      "first_name": "Alice",
+      "last_name": "Nakamura",
+      "email": "alice@northwind-labs.example",
+      "organisation": "Northwind Labs"
+    }
+  ],
+  "terms": {
+    "effective_date": "2026-09-01",
+    "term_length": "2 years",
+    "scope": "the upcoming logistics integration project",
+    "mutuality": "mutual"
+  },
+  "assumptions": [
+    {
+      "field": "governing_law",
+      "value": "State of Delaware, USA",
+      "why": "the request named no jurisdiction, and Delaware is a common default"
+    },
+    {
+      "field": "notice_period",
+      "value": "30 days written notice",
+      "why": "the request said nothing about how either side ends the agreement"
+    },
+    {
+      "field": "survival_period",
+      "value": "3 years after termination",
+      "why": "the request gave a term but not how long confidentiality outlives it"
+    }
+  ]
+}
