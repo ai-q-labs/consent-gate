@@ -108,10 +108,10 @@ def main() -> int:
     caption(
         "STEP 1",
         "One sentence of input.",
-        "The agent will extract intent, check the counterparty, draft the",
-        "document, render it through Foxit, and audit the result.",
+        "The agent will extract intent, check that the counterparty exists,",
+        "draft the document, render it through Foxit, and audit the result.",
     )
-    draft_args = ["draft", PROMPT, "--backend", args.backend, "--no-verify-counterparty"]
+    draft_args = ["draft", PROMPT, "--backend", args.backend]
     if args.offline:
         draft_args.append("--offline")
     output = run(draft_args)
@@ -120,6 +120,8 @@ def main() -> int:
     if not match:
         raise SystemExit("could not read the review packet from the output")
     digest, token = match.group(1), match.group(2)
+    found = re.search(r"blocking\s+(\d+)", output)
+    blocking = int(found.group(1)) if found else 0
     hold(args, 6)
 
     # ------------------------------------------------------------------ 2
@@ -138,8 +140,23 @@ def main() -> int:
         "A human authorises these exact bytes.",
         "The token was printed to the terminal in step 1 and stored nowhere,",
         "so the agent could not have produced it.",
+        *(
+            [
+                "",
+                "A blocking finding needs a written reason as well, and the reason",
+                "is recorded in the ledger next to the approver's name.",
+            ]
+            if blocking
+            else []
+        ),
     )
-    run(["approve", "--doc", digest, "--token", token, "--approver", "K. Sato"])
+    approve = ["approve", "--doc", digest, "--token", token, "--approver", "K. Sato"]
+    if blocking:
+        approve += [
+            "--override-reason",
+            "demo scenario: the counterparty is fictional by design",
+        ]
+    run(approve)
     hold(args, 3)
 
     # ------------------------------------------------------------------ 4

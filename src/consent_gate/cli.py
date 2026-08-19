@@ -101,7 +101,7 @@ def cmd_draft(args: argparse.Namespace) -> int:
     print(f"      {len(request.assumptions)} value(s) the model supplied on your behalf")
 
     verification: VerificationResult | None = None
-    if args.verify_counterparty and serpapi_available():
+    if args.verify_counterparty:
         org = next(
             (p.organisation for p in request.parties if p.role != "sender" and p.organisation),
             "",
@@ -110,17 +110,19 @@ def cmd_draft(args: argparse.Namespace) -> int:
             (p.email.split("@")[-1] for p in request.parties if p.role != "sender" and "@" in p.email),
             "",
         )
-        print(f"[2/6] verify        {org or '(no organisation named)'}")
+        how = "domain + search" if serpapi_available() else "domain only (no SERPAPI_API_KEY)"
+        print(f"[2/6] verify        {org or '(no organisation named)'} - {how}")
         try:
             verification = verify_counterparty(org, domain)
             _write_json(workspace / "verification.json", verification.to_json())
             ledger.append("counterparty.checked", verification.to_json())
             print(f"      verified={verification.verified}  {len(verification.evidence)} source(s)")
+            for item in verification.evidence[:3]:
+                print(f"      - {item.claim}: {item.value[:80]}")
         except VerificationError as exc:
             print(f"      skipped: {exc}")
     else:
-        reason = "disabled" if not args.verify_counterparty else "SERPAPI_API_KEY not set"
-        print(f"[2/6] verify        skipped ({reason})")
+        print("[2/6] verify        skipped (disabled)")
 
     print("[3/6] draft")
     document = draft_document(backend, request, verification)

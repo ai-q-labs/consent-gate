@@ -276,13 +276,20 @@ def _verification_findings(
         )
         return
     if not verification.verified:
+        # Lead with what was actually observed. "No evidence found" is true but
+        # useless; "the domain does not resolve" is what a reader needs.
+        observed = next(
+            (e.value for e in verification.evidence if e.claim == "dns"),
+            "",
+        ) or next((e.value for e in verification.evidence), "")
+        detail = f"The signer's domain {observed}." if observed else verification.note
         yield Finding(
             severity="block",
             code="COUNTERPARTY_NOT_FOUND",
             message=(
-                f"No external evidence found for {verification.counterparty!r}. "
-                f"{verification.note}"
-            ).strip(),
+                f"{verification.counterparty or 'The counterparty'} could not be "
+                f"confirmed to exist. {detail}".strip()
+            ),
             where=verification.counterparty,
         )
         return

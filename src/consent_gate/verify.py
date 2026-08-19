@@ -4,31 +4,135 @@ A prompt-to-contract agent will happily draft a watertight agreement with an
 entity that does not exist, because nothing in the pipeline ever leaves the
 model's head. This stage goes and looks.
 
-It uses SerpApi for live, structured search results, and returns evidence with
-the URL each fact came from, so the reviewer sees sources rather than a
-model's recollection.
+Two checks, and the cheap one runs always:
 
-The stage is optional by design: no key means no verification, and the audit
-raises UNVERIFIED_COUNTERPARTY rather than silently pretending the check
-passed. Absent evidence is reported as absent.
+*   **The signer's domain** - does it resolve, does it serve HTTPS, and how old
+    is its certificate. No key, no account, no network service in between: just
+    DNS and a TLS handshake from the standard library. A counterparty whose
+    domain does not resolve, or whose certificate was issued last week, is
+    worth a second look before you are bound to them.
+
+*   **The organisation** - live search results via SerpApi, returned as
+    evidence with the URL each fact came from, so the reviewer sees sources
+    rather than a model's recollection. Optional: without a key this half is
+    skipped and the audit says so.
+
+Absent evidence is reported as absent. Neither check ever silently passes.
 """
 
 from __future__ import annotations
 
 import json
 import os
+import socket
+import ssl
 import urllib.error
 import urllib.parse
 import urllib.request
+from datetime import datetime, timezone
 from typing import Any
 
 from .models import Evidence, VerificationResult
 
 SERPAPI_ENDPOINT = "https://serpapi.com/search.json"
 
+# A certificate younger than this on a counterparty's domain is not proof of
+# anything, but it is the sort of thing a person should see before signing.
+YOUNG_CERTIFICATE_DAYS = 60
+
 
 class VerificationError(RuntimeError):
     pass
+
+
+# --------------------------------------------------------------------------
+# the keyless half
+
+
+def inspect_domain(domain: str, timeout: float = 8.0) -> list[Evidence]:
+    """DNS + TLS facts about a domain. No credentials, no third-party service."""
+    domain = domain.strip().lower().rstrip(".")
+    if not domain or "." not in domain:
+        return []
+
+    evidence: list[Evidence] = []
+
+    try:
+        infos = socket.getaddrinfo(domain, 443, proto=socket.IPPROTO_TCP)
+        addresses = sorted({info[4][0] for info in infos})
+        evidence.append(
+            Evidence(
+                claim="dns",
+                value=f"resolves to {len(addresses)} address(es)",
+                source_url=f"dns:{domain}",
+                source_title="DNS lookup",
+            )
+        )
+    except socket.gaierror as exc:
+        evidence.append(
+            Evidence(
+                claim="dns",
+                value=f"does not resolve ({exc.strerror or exc})",
+                source_url=f"dns:{domain}",
+                source_title="DNS lookup",
+            )
+        )
+        return evidence
+
+    context = ssl.create_default_context()
+    try:
+        with socket.create_connection((domain, 443), timeout=timeout) as raw:
+            with context.wrap_socket(raw, server_hostname=domain) as tls:
+                cert = tls.getpeercert() or {}
+    except (ssl.SSLError, socket.timeout, OSError) as exc:
+        evidence.append(
+            Evidence(
+                claim="tls",
+                value=f"no usable HTTPS certificate ({type(exc).__name__})",
+                source_url=f"https://{domain}",
+                source_title="TLS handshake",
+            )
+        )
+        return evidence
+
+    issuer = _rdn(cert.get("issuer", ()), "organizationName") or _rdn(
+        cert.get("issuer", ()), "commonName"
+    )
+    raw_not_before = cert.get("notBefore")
+    not_before = _parse_cert_time(raw_not_before if isinstance(raw_not_before, str) else None)
+    age_days = (datetime.now(timezone.utc) - not_before).days if not_before else None
+
+    value = f"valid certificate issued by {issuer or 'an unnamed CA'}"
+    if age_days is not None:
+        value += f", {age_days} days old"
+        if age_days < YOUNG_CERTIFICATE_DAYS:
+            value += " (recent)"
+    evidence.append(
+        Evidence(
+            claim="tls",
+            value=value,
+            source_url=f"https://{domain}",
+            source_title="TLS certificate",
+        )
+    )
+    return evidence
+
+
+def _rdn(rdns: Any, key: str) -> str:
+    for rdn in rdns or ():
+        for pair in rdn:
+            if len(pair) == 2 and pair[0] == key:
+                return str(pair[1])
+    return ""
+
+
+def _parse_cert_time(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.strptime(value, "%b %d %H:%M:%S %Y %Z").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
 
 
 def serpapi_available() -> bool:
@@ -59,10 +163,26 @@ def verify_counterparty(
     email_domain: str = "",
     api_key: str | None = None,
 ) -> VerificationResult:
-    """Look the counterparty up and return what the open web actually says."""
+    """Look the counterparty up and return what the open web actually says.
+
+    The domain check runs unconditionally. The search half runs only if a
+    SerpApi key is configured; without one the result says so rather than
+    claiming the organisation could not be found.
+    """
     key = (api_key or os.environ.get("SERPAPI_API_KEY", "")).strip()
+    domain_evidence = inspect_domain(email_domain) if email_domain else []
+
     if not key:
-        raise VerificationError("SERPAPI_API_KEY is not set")
+        resolves = any(e.claim == "dns" and "does not resolve" not in e.value for e in domain_evidence)
+        return VerificationResult(
+            counterparty=organisation,
+            verified=resolves,
+            evidence=domain_evidence,
+            note=(
+                "Domain checked. The organisation itself was not looked up: no "
+                "SERPAPI_API_KEY is configured."
+            ),
+        )
     if not organisation:
         return VerificationResult(
             counterparty="",
@@ -70,7 +190,7 @@ def verify_counterparty(
             note="the request named no organisation to check",
         )
 
-    evidence: list[Evidence] = []
+    evidence: list[Evidence] = list(domain_evidence)
 
     data = _search(f'"{organisation}" official site', key)
 

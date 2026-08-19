@@ -12,6 +12,7 @@ from consent_gate.audit import audit  # noqa: E402
 from consent_gate.draft import to_html  # noqa: E402
 from consent_gate.intent import _to_request  # noqa: E402
 from consent_gate.llm import LLMError, extract_json  # noqa: E402
+from consent_gate import verify as verify_module  # noqa: E402
 from consent_gate.models import (  # noqa: E402
     Assumption,
     Clause,
@@ -236,6 +237,56 @@ class IntentTests(unittest.TestCase):
         with self.assertRaises(ValueError) as ctx:
             _to_request(raw, "prompt")
         self.assertIn("refusing to guess", str(ctx.exception))
+
+
+class DomainCheckTests(unittest.TestCase):
+    """The keyless half of stage 3. No network: DNS is stubbed."""
+
+    def test_blank_or_bare_names_are_not_domains(self) -> None:
+        self.assertEqual(verify_module.inspect_domain(""), [])
+        self.assertEqual(verify_module.inspect_domain("localhost"), [])
+
+    def test_a_domain_that_does_not_resolve_is_reported(self) -> None:
+        original = verify_module.socket.getaddrinfo
+
+        def boom(*_args, **_kwargs):
+            raise verify_module.socket.gaierror(11001, "getaddrinfo failed")
+
+        verify_module.socket.getaddrinfo = boom
+        try:
+            evidence = verify_module.inspect_domain("northwind-labs.example")
+        finally:
+            verify_module.socket.getaddrinfo = original
+
+        self.assertEqual(len(evidence), 1)
+        self.assertEqual(evidence[0].claim, "dns")
+        self.assertIn("does not resolve", evidence[0].value)
+
+    def test_an_unresolvable_domain_makes_the_counterparty_unverified(self) -> None:
+        original = verify_module.socket.getaddrinfo
+
+        def boom(*_args, **_kwargs):
+            raise verify_module.socket.gaierror(11001, "getaddrinfo failed")
+
+        verify_module.socket.getaddrinfo = boom
+        try:
+            result = verify_module.verify_counterparty(
+                "Northwind Labs", "northwind-labs.example", api_key=""
+            )
+        finally:
+            verify_module.socket.getaddrinfo = original
+
+        self.assertFalse(result.verified)
+        # and that is a blocking finding, not a note nobody reads
+        draft = make_draft([Clause("Term", "Two years.", "term_length")])
+        self.assertIn("COUNTERPARTY_NOT_FOUND", codes(audit(draft, make_request(), PDF, result)))
+
+    def test_certificate_timestamps_parse(self) -> None:
+        parsed = verify_module._parse_cert_time("Jun 10 00:00:00 2026 GMT")
+        assert parsed is not None
+        self.assertEqual((parsed.year, parsed.month, parsed.day), (2026, 6, 10))
+        self.assertIsNone(verify_module._parse_cert_time("not a date"))
+        self.assertIsNone(verify_module._parse_cert_time(None))
 
 
 class ResponseParsingTests(unittest.TestCase):

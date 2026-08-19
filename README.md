@@ -13,40 +13,40 @@ consent-gate draft "Draft a mutual NDA with Northwind Labs and send it to
 ```
 [1/6] intent        (claude-code)
       mutual-nda: Mutual Non-Disclosure Agreement
-      18 value(s) the model supplied on your behalf
-[2/6] verify        skipped (disabled)
+      24 value(s) the model supplied on your behalf
+[2/6] verify        Northwind Labs - domain only (no SERPAPI_API_KEY)
+      verified=False  1 source(s)
+      - dns: does not resolve (getaddrinfo failed)
 [3/6] draft
-      20 clause(s)
+      21 clause(s)
 [4/6] render        Foxit PDF Services
-      workspace/document.pdf (70,558 bytes)
+      workspace/document.pdf (69,877 bytes)
 [5/6] audit
-  [WARN ] ASSIGNMENT               15. Assignment
+  [BLOCK] COUNTERPARTY_NOT_FOUND   Northwind Labs
+          Northwind Labs could not be confirmed to exist. The signer's domain
+          does not resolve (getaddrinfo failed).
+  [WARN ] ASSIGNMENT               Assignment
           Rights or obligations can be transferred to a third party.
   [WARN ] ASSUMPTION               governing_law
-          governing_law was assumed to be 'State of Delaware, USA' (The request is
-          silent on governing law; Delaware is a common default for US commercial
-          contracts. Must be confirmed.).
-  [WARN ] ASSUMPTION               jurisdiction_venue
-          jurisdiction_venue was assumed to be 'Exclusive jurisdiction of the state
-          and federal courts located in Delaware' (No forum was specified; paired
-          with the assumed governing law.).
-  [info ] UNREQUESTED_CLAUSE       14. No Obligation to Proceed
-          This clause was added by the model and traces to nothing you said.
-  ... 22 more findings
+          governing_law was assumed to be 'State of Delaware, USA' (The request
+          is silent on governing law; Delaware is a common default for US
+          commercial contracts. Must be confirmed.).
+  ... 27 more findings
 [6/6] gate
 
 ========================================================================
   STOP. This is as far as the agent goes.
 ========================================================================
-  sha256     c058cac2ca2e9be18e71822170f4f8da2ebdafba0fe68a17ce4bd8867d35341f
-  blocking   0    warnings 20
+  sha256     2d6063ec65abb0e5945732692579f29bde4587a40452a99c53ce33ff27ac156e
+  blocking   1    warnings 25
 ```
 
-*(Real transcript, trimmed only where marked. One sentence of input; the model
-returned twenty clauses and declared eighteen values it had supplied on the
-operator's behalf — including the governing law and the forum, neither of which
-the request mentioned. Every figure in this README comes from that run or from
-the test suite. None of it is illustrative.)*
+*(Real transcript, trimmed only where marked. One sentence of input. The model
+returned twenty-one clauses and declared twenty-four values it had supplied on
+the operator's behalf — the governing law, the forum, the liability cap, the
+notice period. And the counterparty it was told to contract with does not have
+a domain that resolves, which is a blocking finding, not a footnote. Every
+figure in this README comes from that run or from the test suite.)*
 
 The agent stops there. It has drafted the document, rendered it, checked that
 the other party exists, and listed everything it invented on your behalf — but
@@ -85,8 +85,8 @@ Approval binds to the SHA-256 of the rendered PDF. `send` re-hashes the file it
 is about to transmit and looks for an authorisation of *that* digest.
 
 ```console
-$ consent-gate approve --doc c058cac2ca2e9be1 --token <token> --approver "K. Sato"
-authorised sha256:c058cac2ca2e9be1...  by K. Sato
+$ consent-gate approve --doc 2d6063ec65abb0e5 --token <token> --approver "K. Sato"
+authorised sha256:2d6063ec65abb0e5...  by K. Sato
 
 $ printf ' ' >> workspace/document.pdf     # one byte
 
@@ -113,18 +113,19 @@ deleting any line is detectable:
 
 ```console
 $ consent-gate ledger
-#0   2026-08-19T14:53:54+00:00  run.started
-#1   2026-08-19T14:54:13+00:00  intent.extracted
-#2   2026-08-19T14:56:25+00:00  draft.written
-#3   2026-08-19T14:56:39+00:00  document.rendered      c058cac2ca2e
-#4   2026-08-19T14:56:39+00:00  review.requested       0 blocking, 20 warnings
-#5   2026-08-19T14:56:56+00:00  human.authorised       K. Sato -> c058cac2ca2e
-#6   2026-08-19T14:57:13+00:00  esign.dispatched       folder 35443545
+#0   2026-08-19T16:14:51+00:00  run.started
+#1   2026-08-19T16:15:15+00:00  intent.extracted
+#2   2026-08-19T16:15:15+00:00  counterparty.checked
+#3   2026-08-19T16:15:50+00:00  draft.written
+#4   2026-08-19T16:16:04+00:00  document.rendered      2d6063ec65ab
+#5   2026-08-19T16:16:04+00:00  review.requested       1 blocking, 25 warnings
+#6   2026-08-19T16:16:14+00:00  human.authorised       K. Sato -> 2d6063ec65ab
+#7   2026-08-19T16:16:23+00:00  esign.dispatched       folder 35446153
 
-chain: OK - 7 entries, chain intact
+chain: OK - 8 entries, chain intact
 ```
 
-Line #6 carries the same digest as #5. That is the whole point: the ledger
+Line #7 carries the same digest as #6. That is the whole point: the ledger
 answers "was the document that went out the document that was approved?"
 without asking you to trust the program that sent it.
 
@@ -169,8 +170,8 @@ depends on whether the clause contains binding language.
 | `UNREQUESTED_OBLIGATION` | warn | binds somebody, traces to nothing you said |
 | `UNREQUESTED_CLAUSE` | info | added by the model, binds nobody |
 | `ASSUMPTION` | warn | one per value the model supplied on your behalf |
-| `UNVERIFIED_COUNTERPARTY` | warn | nobody checked that the other side exists |
-| `COUNTERPARTY_NOT_FOUND` | block | it was checked, and nothing was found |
+| `UNVERIFIED_COUNTERPARTY` | warn | verification was switched off entirely |
+| `COUNTERPARTY_NOT_FOUND` | block | it was checked — the domain does not resolve, or nothing confirms the organisation |
 | `EMAIL_DOMAIN_UNCONFIRMED` | warn | the signer's domain appears in no confirming source |
 
 Blocking findings stop `approve` unless the operator supplies
@@ -178,19 +179,36 @@ Blocking findings stop `approve` unless the operator supplies
 
 ---
 
-## Counterparty verification (SerpApi)
-
-Stage 3 asks the open web whether the other party is a real entity, and returns
-evidence with the URL each fact came from — knowledge-graph entries, organic
-results, and a targeted check that the signer's email domain appears in a
-source that confirms the organisation.
+## Counterparty verification
 
 You are otherwise about to be bound to a name that only ever existed inside a
-language model's context window.
+language model's context window. Stage 3 goes and looks, in two ways.
 
-The stage is optional and fails loudly rather than silently: no
-`SERPAPI_API_KEY` produces an `UNVERIFIED_COUNTERPARTY` warning on the review
-screen, never a quiet pass.
+**The signer's domain — always, no credentials.** DNS resolution and a TLS
+handshake from the standard library: does the domain exist, does it serve
+HTTPS, who issued the certificate, and how old is it. That is enough to catch
+the case that matters:
+
+```
+[2/6] verify        Northwind Labs - domain only (no SERPAPI_API_KEY)
+      verified=False  1 source(s)
+      - dns: does not resolve (getaddrinfo failed)
+...
+  [BLOCK] COUNTERPARTY_NOT_FOUND   Northwind Labs
+          Northwind Labs could not be confirmed to exist. The signer's domain
+          does not resolve (getaddrinfo failed).
+```
+
+A certificate issued three days ago on the domain of a company you are about to
+sign a two-year agreement with is not proof of anything — and it is exactly the
+sort of thing a person should be shown before signing rather than after.
+
+**The organisation — via SerpApi, when a key is present.** Live search results
+returned as evidence carrying the URL each fact came from: knowledge-graph
+entries, organic results, and a targeted check that the signer's email domain
+appears in a source that confirms the organisation. Without a key this half is
+skipped and the report says so, rather than reporting an absence of evidence as
+evidence of absence.
 
 ---
 
@@ -200,7 +218,7 @@ Python 3.11+. **The core has no third-party dependencies** — clone it and run.
 
 ```bash
 git clone <this repo> && cd consent-gate
-python -m unittest discover -s tests     # 39 tests, no keys, no network
+python -m unittest discover -s tests     # 43 tests, no keys, no network
 ```
 
 Try the whole pipeline with no credentials at all:
@@ -242,7 +260,7 @@ consent-gate ledger
 | `FOXIT_CLIENT_ID` / `FOXIT_CLIENT_SECRET` | stages 5 and 8 | free developer account, 500 credits/year, no card |
 | `FOXIT_HOST` | — | defaults to `https://na1.fusion.foxit.com` |
 | `FOXIT_ESIGN_PREFIX` | — | `/esign/api/v1` by default; falls back to `/api` on 404 |
-| `SERPAPI_API_KEY` | stage 3 | optional; absence is reported, not hidden |
+| `SERPAPI_API_KEY` | stage 3, search half | optional; the domain check runs without it, and its absence is reported rather than hidden |
 | `ANTHROPIC_API_KEY` | `--backend anthropic` | not needed for `claude-code` or `mock` |
 
 Nothing is read from the repository. Credentials come from the environment.
@@ -329,18 +347,21 @@ Verified end to end against the live Foxit APIs on 19 August 2026:
 
 | | |
 |---|---|
-| Model | a real drafting run through the local Claude CLI: **20 clauses, 18 declared assumptions** |
-| PDF Services | upload → `create/pdf-from-html` → poll → download, **70,558 bytes**, `%PDF-` header |
-| eSign | `folders/createfolder` → **folder 35443545**, `folderStatus: DRAFT`, party recorded |
+| Model | a real drafting run through the local Claude CLI: **21 clauses, 24 declared assumptions** |
+| PDF Services | upload → `create/pdf-from-html` → poll → download, **69,877 bytes**, `%PDF-` header |
+| eSign | `folders/createfolder` → **folder 35446153**, `folderStatus: DRAFT`, party recorded |
 | Gate | send before approval, wrong token, and one-byte edit after approval — **all three refused** |
-| Ledger | 7 entries, chain intact, `esign.dispatched` carrying the digest that was approved |
-| Tests | **39 passing**, no keys, no network, no third-party packages |
+| Verification | the demo counterparty's domain does not resolve — **a blocking finding**, overridden only with a written reason recorded in the ledger |
+| Ledger | 8 entries, chain intact, `esign.dispatched` carrying the digest that was approved |
+| Tests | **43 passing**, no keys, no network, no third-party packages |
 
 `--draft-only` was used for the live eSign run, so the envelope exists in Foxit
 but no email was sent.
 
-The SerpApi stage is implemented but has not yet been exercised against the live
-API, and the `anthropic` backend is written from the SDK documentation but has
-not been run. Both are stated here rather than implied to work.
+The domain half of stage 3 runs and is covered by tests. The SerpApi half is
+implemented but has not been exercised against the live API — SerpApi's free
+tier requires phone verification, which we have not completed. The `anthropic`
+backend is written from the SDK documentation and has not been run. Both are
+stated here rather than implied to work.
 
 MIT licensed.
