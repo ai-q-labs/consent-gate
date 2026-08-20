@@ -23,6 +23,7 @@ from pathlib import Path
 
 from .audit import audit as run_audit
 from .draft import draft_document, to_html
+from .env import load_env
 from .foxit import Credentials, ESign, FoxitError, PdfServices, party_payload
 from .gate import ConsentGate, GateError, sha256_file
 from .intent import extract_intent
@@ -30,6 +31,13 @@ from .ledger import Ledger
 from .llm import LLMError, get_backend
 from .models import AuditReport, DocumentRequest, Draft, Finding, Party, VerificationResult
 from .verify import VerificationError, serpapi_available, verify_counterparty
+
+# Before anything reads the environment: .env.example tells the reader to copy
+# it to .env, so .env has to actually take effect. Looked up from the cwd
+# first, then from the installed package, so it works from a clone and from an
+# editable install alike.
+if not load_env():
+    load_env(Path(__file__).resolve().parent)
 
 DEFAULT_WORKSPACE = Path(os.environ.get("CONSENT_GATE_WORKSPACE", "workspace"))
 

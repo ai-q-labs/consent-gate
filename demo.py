@@ -60,13 +60,13 @@ def caption(number: str, title: str, *lines: str) -> None:
     print()
 
 
-def run(args: list[str], expect_failure: bool = False) -> str:
+def run(args: list[str], expect_failure: bool = False, workspace: Path | None = None) -> str:
     # The prompt is a paragraph; printing it inline makes the command
     # unreadable on screen, so long arguments are elided in the echo only.
     shown = [a if len(a) < 56 else f'"{a[:52]} ..."' for a in args]
     print("$ " + " ".join(["consent-gate", *shown]) + "\n")
     proc = subprocess.run(
-        [sys.executable, "-m", "consent_gate.cli", "--workspace", str(WORKSPACE), *args],
+        [sys.executable, "-m", "consent_gate.cli", "--workspace", str(workspace or WORKSPACE), *args],
         cwd=ROOT,
         env={**os.environ, "PYTHONPATH": str(ROOT / "src"), "PYTHONIOENCODING": "utf-8"},
         capture_output=True,
@@ -95,6 +95,14 @@ def main() -> int:
     parser.add_argument("--offline", action="store_true", help="skip Foxit entirely")
     parser.add_argument("--pause", action="store_true", help="wait for Enter between steps")
     parser.add_argument("--backend", default="claude-code", choices=["claude-code", "anthropic", "mock"])
+    parser.add_argument(
+        "--signed-run",
+        default="workspace-signed2",
+        help=(
+            "a previous workspace whose document was actually signed; its ledger "
+            "is shown at the end. Pass an empty string to skip that step."
+        ),
+    )
     args = parser.parse_args()
 
     print()
@@ -195,6 +203,26 @@ def main() -> int:
         "carries the same digest the human authorised.",
     )
     run(["ledger"])
+    hold(args, 5)
+
+    # ------------------------------------------------------------------ 7
+    # Everything above runs against a fictional counterparty, so nobody can
+    # sign it. This is a real run that a real person signed, kept so the
+    # demo can end where the brief says it should: at a signed document.
+    signed = ROOT / args.signed_run if args.signed_run else None
+    if signed and (signed / "ledger.jsonl").exists():
+        caption(
+            "STEP 7",
+            "A run that a person actually signed.",
+            "Separate run, real inbox, signed by hand in Foxit's own UI.",
+            "Read the last line: the file that came back is tied to the exact",
+            "bytes a human approved, in a record neither side can rewrite.",
+        )
+        run(["ledger"], workspace=signed)
+        pdf = signed / "document.signed.pdf"
+        if pdf.exists():
+            print(f"\n      {pdf.name}   {pdf.stat().st_size:,} bytes, countersigned by Foxit")
+        hold(args, 5)
 
     print()
     print("=" * WIDTH)

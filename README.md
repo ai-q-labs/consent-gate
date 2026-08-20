@@ -46,7 +46,11 @@ returned twenty-one clauses and declared twenty-four values it had supplied on
 the operator's behalf — the governing law, the forum, the liability cap, the
 notice period. And the counterparty it was told to contract with does not have
 a domain that resolves, which is a blocking finding, not a footnote. Every
-figure in this README comes from that run or from the test suite.)*
+figure in this README comes from that run or from the test suite. Run it
+yourself and the counts will differ — across ours the declared values have
+been eighteen, twenty, twenty-three and twenty-four, which is rather the
+point: there is no fixed set of defaults you can review once and then stop
+checking.)*
 
 The agent stops there. It has drafted the document, rendered it, checked that
 the other party exists, and listed everything it invented on your behalf — but
@@ -218,7 +222,7 @@ Python 3.11+. **The core has no third-party dependencies** — clone it and run.
 
 ```bash
 git clone <this repo> && cd consent-gate
-python -m unittest discover -s tests     # 46 tests, no keys, no network
+python -m unittest discover -s tests     # 52 tests, no keys, no network
 ```
 
 Try the whole pipeline with no credentials at all:
@@ -248,7 +252,7 @@ would type — there is no separate demo path through the code.
 
 ```bash
 pip install -e .                 # or: pip install -e ".[anthropic]"
-cp .env.example .env             # then fill it in and source it
+cp .env.example .env             # fill it in; the CLI reads it, no sourcing needed
 consent-gate draft "..."
 consent-gate approve --doc <prefix> --token <token> --approver "Your Name"
 consent-gate send                 # or --draft-only to create the envelope without emailing
@@ -393,7 +397,7 @@ Verified end to end against the live Foxit APIs on 19 August 2026:
 | Verification | the demo counterparty's domain does not resolve — **a blocking finding**, overridden only with a written reason recorded in the ledger |
 | **Signature** | a second run went the whole way: sent for real, **signed by a human in Foxit**, and the signed PDF collected back — **115,567 bytes**, ledger closed at **9 entries** |
 | Ledger | chain intact; `signature.collected` carries both the approved digest and the signed one |
-| Tests | **46 passing**, no keys, no network, no third-party packages |
+| Tests | **52 passing**, no keys, no network, no third-party packages |
 
 `--draft-only` was used for the live eSign run, so the envelope exists in Foxit
 but no email was sent.
