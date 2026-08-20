@@ -29,7 +29,15 @@ from .gate import ConsentGate, GateError, sha256_file
 from .intent import extract_intent
 from .ledger import Ledger
 from .llm import LLMError, get_backend
-from .models import AuditReport, DocumentRequest, Draft, Finding, Party, VerificationResult
+from .models import (
+    AuditReport,
+    DocumentRequest,
+    Draft,
+    Finding,
+    Party,
+    VerificationResult,
+    display_path,
+)
 from .verify import VerificationError, serpapi_available, verify_counterparty
 
 # Before anything reads the environment: .env.example tells the reader to copy
@@ -150,7 +158,7 @@ def cmd_draft(args: argparse.Namespace) -> int:
         credentials = Credentials.from_env()
         pdf_bytes = PdfServices(credentials).render_html(html_path)
         pdf_path.write_bytes(pdf_bytes)
-        print(f"      {pdf_path} ({len(pdf_bytes):,} bytes)")
+        print(f"      {display_path(pdf_path)} ({len(pdf_bytes):,} bytes)")
     ledger.append(
         "document.rendered",
         {"path": str(pdf_path), "sha256": sha256_file(pdf_path), "offline": args.offline},
@@ -167,7 +175,7 @@ def cmd_draft(args: argparse.Namespace) -> int:
     print("=" * 72)
     print("  STOP. This is as far as the agent goes.")
     print("=" * 72)
-    print(f"  document   {pdf_path}")
+    print(f"  document   {display_path(pdf_path)}")
     print(f"  sha256     {packet.document_sha256}")
     print(f"  blocking   {len(report.blocking)}    warnings {len(report.warnings)}")
     print()

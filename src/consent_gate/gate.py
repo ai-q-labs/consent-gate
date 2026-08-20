@@ -36,7 +36,7 @@ from pathlib import Path
 from typing import Any
 
 from .ledger import Ledger, utcnow
-from .models import AuditReport, sha256_hex
+from .models import AuditReport, display_path, sha256_hex
 
 EVENT_REVIEW = "review.requested"
 EVENT_APPROVE = "human.authorised"
@@ -132,7 +132,7 @@ class ConsentGate:
                 return entry
         raise GateError(
             f"refusing to send: no human authorisation for sha256:{digest[:12]}...\n"
-            f"  file      {pdf_path}\n"
+            f"  file      {display_path(pdf_path)}\n"
             "  Any edit to the document invalidates an earlier approval by design."
         )
 

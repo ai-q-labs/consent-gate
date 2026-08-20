@@ -47,6 +47,13 @@ PROMPT = (
 
 WIDTH = 78
 
+# Unattended pacing is for someone watching a recording, not for the author
+# who already knows what each screen says. The first take of our demo video
+# crossed the two most important screens - the twenty-five values the model
+# chose on its own, and the refusal - inside the same second, because they
+# were being advanced by hand. --pause overrides this entirely.
+PACE = 2.6
+
 
 def caption(number: str, title: str, *lines: str) -> None:
     # ASCII only: box-drawing characters turn into mojibake on a console still
@@ -65,21 +72,37 @@ def run(args: list[str], expect_failure: bool = False, workspace: Path | None = 
     # unreadable on screen, so long arguments are elided in the echo only.
     shown = [a if len(a) < 56 else f'"{a[:52]} ..."' for a in args]
     print("$ " + " ".join(["consent-gate", *shown]) + "\n")
-    proc = subprocess.run(
-        [sys.executable, "-m", "consent_gate.cli", "--workspace", str(workspace or WORKSPACE), *args],
+    # Streamed rather than captured: drafting calls a real model and takes
+    # over a minute, and a minute of a frozen screen is a minute of a
+    # recording. Unbuffered so each stage appears as it happens instead of
+    # arriving together at the end.
+    proc = subprocess.Popen(
+        [sys.executable, "-u", "-m", "consent_gate.cli", "--workspace", str(workspace or WORKSPACE), *args],
         cwd=ROOT,
-        env={**os.environ, "PYTHONPATH": str(ROOT / "src"), "PYTHONIOENCODING": "utf-8"},
-        capture_output=True,
+        env={
+            **os.environ,
+            "PYTHONPATH": str(ROOT / "src"),
+            "PYTHONIOENCODING": "utf-8",
+            "PYTHONUNBUFFERED": "1",
+        },
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
         text=True,
         encoding="utf-8",
         errors="replace",
+        bufsize=1,
     )
-    output = (proc.stdout or "") + (proc.stderr or "")
-    print(output.rstrip())
-    if expect_failure and proc.returncode == 0:
+    captured: list[str] = []
+    assert proc.stdout is not None
+    for line in proc.stdout:
+        print(line.rstrip())
+        captured.append(line)
+    returncode = proc.wait()
+    output = "".join(captured)
+    if expect_failure and returncode == 0:
         raise SystemExit("expected this step to be refused, and it was not")
-    if not expect_failure and proc.returncode != 0:
-        raise SystemExit(f"step failed with {proc.returncode}")
+    if not expect_failure and returncode != 0:
+        raise SystemExit(f"step failed with {returncode}")
     return output
 
 
@@ -87,10 +110,20 @@ def hold(args: argparse.Namespace, seconds: float = 2.0) -> None:
     if args.pause:
         input("\n      [Enter to continue]")
     else:
-        time.sleep(seconds)
+        time.sleep(seconds * PACE)
 
 
 def main() -> int:
+    # The CLI already guards its own output this way, but this script prints
+    # that output a second time through its own stdout, which on a Windows
+    # console is still a legacy code page. Without this, the first em dash in a
+    # model-written clause ends the run - and it would do it mid-recording,
+    # after the PDF had been rendered and billed.
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(encoding="utf-8", errors="replace")
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--offline", action="store_true", help="skip Foxit entirely")
     parser.add_argument("--pause", action="store_true", help="wait for Enter between steps")
@@ -130,7 +163,9 @@ def main() -> int:
     digest, token = match.group(1), match.group(2)
     found = re.search(r"blocking\s+(\d+)", output)
     blocking = int(found.group(1)) if found else 0
-    hold(args, 6)
+    # The longest screen in the run, and the one the whole submission is
+    # about: the findings list plus every value the model supplied unasked.
+    hold(args, 10)
 
     # ------------------------------------------------------------------ 2
     caption(

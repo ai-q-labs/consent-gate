@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from consent_gate.gate import ConsentGate, GateError, sha256_file  # noqa: E402
 from consent_gate.ledger import Ledger  # noqa: E402
-from consent_gate.models import AuditReport, Finding, sha256_hex  # noqa: E402
+from consent_gate.models import AuditReport, Finding, display_path, sha256_hex  # noqa: E402
 
 
 def report_for(data: bytes, findings: list[Finding] | None = None) -> AuditReport:
@@ -155,6 +155,36 @@ class GateTests(unittest.TestCase):
         with self.assertRaises(GateError) as ctx:
             self.gate.open_review(self.pdf, stale)
         self.assertIn("different bytes", str(ctx.exception))
+
+    # -- what goes on screen ----------------------------------------------
+
+    def test_refusal_does_not_print_the_home_directory(self) -> None:
+        # This tool gets run in screen recordings and shared terminals. An
+        # absolute path would put the operator's username on someone else's
+        # display, so refusals name the file without the tree above it.
+        with self.assertRaises(GateError) as ctx:
+            self.gate.assert_authorised(self.pdf)
+        message = str(ctx.exception)
+        self.assertIn(self.pdf.name, message)
+        self.assertNotIn(str(Path.home()), message)
+        self.assertNotIn(str(self.pdf.parent), message)
+
+
+class DisplayPathTests(unittest.TestCase):
+    def test_relative_to_the_working_directory(self) -> None:
+        target = Path.cwd() / "workspace" / "document.pdf"
+        shown = display_path(target)
+        self.assertEqual(Path(shown), Path("workspace/document.pdf"))
+        self.assertFalse(Path(shown).is_absolute())
+
+    def test_outside_the_working_directory_keeps_only_the_name(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            outside = Path(tmp) / "nested" / "document.pdf"
+            self.assertEqual(display_path(outside), "document.pdf")
+
+    def test_never_reveals_the_home_directory(self) -> None:
+        shown = display_path(Path.home() / "secrets" / "document.pdf")
+        self.assertNotIn(str(Path.home()), shown)
 
 
 if __name__ == "__main__":

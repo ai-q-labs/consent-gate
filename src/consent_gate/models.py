@@ -11,6 +11,7 @@ import dataclasses
 import hashlib
 import json
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 
@@ -21,6 +22,23 @@ def sha256_hex(data: bytes) -> str:
 def canonical_json(obj: Any) -> str:
     """Stable JSON used wherever a value gets hashed."""
     return json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+
+
+def display_path(path: Path) -> str:
+    """A path as the operator would type it, for printing only.
+
+    An absolute path on most systems contains a home directory and therefore a
+    username. This tool is meant to be run in front of other people — in a
+    screen recording, over a shared terminal, in a support ticket — so what
+    goes on screen is relative to the working directory, and falls back to the
+    bare filename rather than leaking the tree above it. The ledger keeps the
+    full path; only the display is shortened.
+    """
+    resolved = Path(path).resolve()
+    try:
+        return str(resolved.relative_to(Path.cwd().resolve()))
+    except ValueError:
+        return resolved.name
 
 
 def _asdict(obj: Any) -> Any:
