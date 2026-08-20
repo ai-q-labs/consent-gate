@@ -101,6 +101,10 @@ HTML_TEMPLATE = """<!doctype html>
   .sigline {{ margin-top: 10mm; }}
   .sigline div {{ border-top: 1px solid #111; width: 70mm; padding-top: 2mm;
                   margin-bottom: 8mm; font-size: 9pt; }}
+  /* Foxit keeps the text tags on the page after converting them to fields.
+     Rendering them in the page colour leaves the parser its input and the
+     signer a clean document. */
+  .tag {{ color: #ffffff; font-size: 9pt; margin: 0; }}
 </style>
 </head>
 <body>
@@ -130,9 +134,16 @@ def _escape(text: str) -> str:
 def to_html(draft: Draft, request: DocumentRequest) -> str:
     """Render the draft as HTML, with Foxit eSign text tags on the signature lines.
 
-    ``processTextTags`` on the eSign side turns ``[sig|req|signer1]`` into a real
-    signature field bound to the first party, so the field placement lives in
-    the document rather than in hard-coded coordinates.
+    ``processTextTags`` on the eSign side turns ``${signfield:1:y:____}`` into a
+    real signature field bound to party 1, so field placement lives in the
+    document rather than in hard-coded page coordinates and survives a re-draft
+    that changes the page count.
+
+    The syntax is exact and unforgiving: ``${fieldtype:party:required:name:width}``,
+    width written as underscores, straight ASCII only, and **a single space
+    anywhere inside the tag stops it being recognised**. Foxit converts the tags
+    but does not remove them from the page, so they are rendered in the page
+    colour - present for the parser, invisible to the signer.
     """
     clauses_html = "\n".join(
         f'  <li><span class="heading">{_escape(c.heading)}.</span> {_escape(c.text)}</li>'
@@ -144,8 +155,9 @@ def to_html(draft: Draft, request: DocumentRequest) -> str:
         label = _escape(party.full_name or party.email)
         org = f" &mdash; {_escape(party.organisation)}" if party.organisation else ""
         lines.append(
-            f"  <p>[sig|req|signer{index}]</p>\n"
-            f"  <div>{label}{org}<br>Date: [date|req|signer{index}]</div>"
+            f'  <p class="tag">${{signfield:{index}:y:____________________}}</p>\n'
+            f"  <div>{label}{org}<br>"
+            f'Date: <span class="tag">${{datefield:{index}:y::____________}}</span></div>'
         )
     return HTML_TEMPLATE.format(
         title=_escape(draft.title),

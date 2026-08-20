@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import sys
 import unittest
 from pathlib import Path
@@ -289,6 +290,35 @@ class DomainCheckTests(unittest.TestCase):
         self.assertIsNone(verify_module._parse_cert_time(None))
 
 
+class NullHandlingTests(unittest.TestCase):
+    """A model returning JSON null must not become the string "None"."""
+
+    def test_a_null_organisation_does_not_print_as_None(self) -> None:
+        raw = {
+            "doc_type": "nda",
+            "title": None,
+            "parties": [
+                {
+                    "role": "counterparty",
+                    "first_name": "Alice",
+                    "last_name": "Nakamura",
+                    "email": "alice@example.com",
+                    "organisation": None,
+                }
+            ],
+            "assumptions": [{"field": "governing_law", "value": None, "why": "not stated"}],
+            "terms": {"term_length": None},
+        }
+        request = _to_request(raw, "prompt")
+        self.assertEqual(request.parties[0].organisation, "")
+        self.assertEqual(request.title, "Agreement")
+        self.assertEqual(request.terms["term_length"], "")
+        self.assertEqual(request.assumptions[0].value, "(left blank)")
+
+        html = to_html(make_draft([Clause("Term", "Two years.", "x")]), request)
+        self.assertNotIn("None", html)
+
+
 class ResponseParsingTests(unittest.TestCase):
     def test_plain_json(self) -> None:
         self.assertEqual(extract_json('{"a": 1}'), {"a": 1})
@@ -308,9 +338,22 @@ class RenderingTests(unittest.TestCase):
     def test_signature_text_tags_are_emitted_per_signer(self) -> None:
         draft = make_draft([Clause("Term", "Two years.", "term_length")])
         html = to_html(draft, make_request())
-        self.assertIn("[sig|req|signer1]", html)
-        self.assertIn("[date|req|signer1]", html)
-        self.assertNotIn("[sig|req|signer2]", html)
+        self.assertIn("${signfield:1:y:", html)
+        self.assertIn("${datefield:1:y::", html)
+        self.assertNotIn("${signfield:2", html)
+
+    def test_text_tags_contain_no_spaces(self) -> None:
+        # Foxit's parser drops a tag containing a single space, and the signer
+        # then receives a document with no signature field and no warning.
+        html = to_html(make_draft([Clause("Term", "Two years.", "term_length")]), make_request())
+        for tag in re.findall(r"\$\{[^}]*\}", html):
+            self.assertNotIn(" ", tag, f"space inside text tag: {tag!r}")
+            self.assertTrue(tag.isascii(), f"non-ASCII inside text tag: {tag!r}")
+
+    def test_text_tags_are_rendered_in_the_page_colour(self) -> None:
+        html = to_html(make_draft([Clause("Term", "Two years.", "term_length")]), make_request())
+        self.assertIn(".tag { color: #ffffff", html)
+        self.assertIn('class="tag"', html)
 
     def test_content_is_escaped(self) -> None:
         draft = make_draft([Clause("Term", "5 < 6 & 7 > 2", "term_length")])

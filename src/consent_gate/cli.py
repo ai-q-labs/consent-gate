@@ -1,10 +1,11 @@
 """Command line interface.
 
-Four verbs, and the split between them is the design:
+Five verbs, and the split between them is the design:
 
     consent-gate draft "..."     stages 2-6. Ends at the gate, never past it.
     consent-gate approve         the human, out of band, with the review token.
     consent-gate send            stage 8. Refuses unless the bytes were approved.
+    consent-gate collect         fetch the signed document back once a human signed.
     consent-gate ledger          replay and verify the chain afterwards.
 
 `draft` cannot send. `send` cannot approve. That separation is not politeness -
@@ -281,6 +282,59 @@ def cmd_send(args: argparse.Namespace) -> int:
 
 
 # --------------------------------------------------------------------------
+# collect
+
+
+def cmd_collect(args: argparse.Namespace) -> int:
+    """Fetch the signed document back and close the chain."""
+    workspace = _workspace(args)
+    ledger = _ledger(args)
+
+    dispatched = ledger.find("esign.dispatched")
+    if not dispatched and not args.folder:
+        print("nothing has been dispatched from this workspace", file=sys.stderr)
+        return 2
+    last = dispatched[-1]["data"] if dispatched else {}
+    folder_id = args.folder or str(last.get("folder_id", ""))
+    if not folder_id:
+        print("no folder id recorded; pass --folder", file=sys.stderr)
+        return 2
+
+    credentials = Credentials.from_env()
+    signed = ESign(credentials).download(folder_id)
+    if not signed.startswith(b"%PDF"):
+        preview = signed[:200].decode("utf-8", "replace")
+        print(f"folder {folder_id} did not return a PDF - is it signed yet?\n  {preview}")
+        return 1
+
+    out = Path(args.out) if args.out else workspace / "document.signed.pdf"
+    out.write_bytes(signed)
+    signed_digest = sha256_file(out)
+    approved = str(last.get("document_sha256", ""))
+
+    ledger.append(
+        "signature.collected",
+        {
+            "folder_id": folder_id,
+            "approved_sha256": approved,
+            "signed_sha256": signed_digest,
+            "path": str(out),
+            "bytes": len(signed),
+        },
+    )
+    print(f"signed document retrieved: {out} ({len(signed):,} bytes)")
+    print(f"  approved  sha256:{approved[:16]}...")
+    print(f"  signed    sha256:{signed_digest[:16]}...")
+    print()
+    print("  These differ, and they should: signing adds content to the file. The")
+    print("  ledger holds both, so the chain reads approved -> dispatched -> signed")
+    print("  with one folder id tying them together. This program does not claim to")
+    print("  prove cryptographically that the signed file contains the approved")
+    print("  bytes - that is the signing platform's job, and its own signature.")
+    return 0
+
+
+# --------------------------------------------------------------------------
 # ledger
 
 
@@ -299,6 +353,10 @@ def cmd_ledger(args: argparse.Namespace) -> int:
             summary = f"folder {data.get('folder_id', '')}"
         elif entry["event"] == "document.rendered":
             summary = data["sha256"][:12]
+        elif entry["event"] == "signature.collected":
+            summary = f"signed {data['signed_sha256'][:12]} <- approved {data['approved_sha256'][:12]}"
+        elif entry["event"] == "counterparty.checked":
+            summary = f"verified={data.get('verified')}"
         print(f"#{entry['seq']:<3} {entry['ts']}  {entry['event']:<22} {summary}")
     print()
     print(f"chain: {'OK' if ok else 'BROKEN'} - {reason}")
@@ -362,6 +420,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="create the eSign envelope but do not email the signer (sendNow=false)",
     )
     p_send.set_defaults(func=cmd_send)
+
+    p_collect = sub.add_parser("collect", help="fetch the signed document back from Foxit eSign")
+    p_collect.add_argument("--folder", default="", help="folder id (default: the last one dispatched)")
+    p_collect.add_argument("--out", default="", help="where to write the signed PDF")
+    p_collect.set_defaults(func=cmd_collect)
 
     p_ledger = sub.add_parser("ledger", help="replay the run and verify the hash chain")
     p_ledger.set_defaults(func=cmd_ledger)

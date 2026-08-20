@@ -218,7 +218,7 @@ Python 3.11+. **The core has no third-party dependencies** — clone it and run.
 
 ```bash
 git clone <this repo> && cd consent-gate
-python -m unittest discover -s tests     # 43 tests, no keys, no network
+python -m unittest discover -s tests     # 46 tests, no keys, no network
 ```
 
 Try the whole pipeline with no credentials at all:
@@ -251,7 +251,8 @@ pip install -e .                 # or: pip install -e ".[anthropic]"
 cp .env.example .env             # then fill it in and source it
 consent-gate draft "..."
 consent-gate approve --doc <prefix> --token <token> --approver "Your Name"
-consent-gate send
+consent-gate send                 # or --draft-only to create the envelope without emailing
+consent-gate collect              # once a human has signed
 consent-gate ledger
 ```
 
@@ -302,10 +303,18 @@ authenticate the same way (`client_id` / `client_secret` in named headers, no
 OAuth exchange), so the client is ~280 lines of `urllib`.
 
 **Signature fields via text tags.** The rendered HTML carries
-`[sig|req|signer1]` and `[date|req|signer1]`; `processTextTags: true` turns
-them into real fields on the eSign side. Field placement lives in the document
-instead of in hard-coded page coordinates, so it survives a re-draft that
-changes the page count.
+`${signfield:1:y:____}` and `${datefield:1:y::____}`; `processTextTags: true`
+turns them into real fields on the eSign side. Field placement lives in the
+document instead of in hard-coded page coordinates, so it survives a re-draft
+that changes the page count.
+
+The syntax is exact and fails silently: a single space inside a tag stops it
+being recognised, and the signer then opens a document with **zero required
+fields** and can finish without signing anything. We only found that by opening
+a real signing session and looking at it — the API had returned success. Foxit
+converts the tags but leaves them on the page, so they are rendered in the page
+colour: present for the parser, invisible to the signer. Both properties are
+now unit-tested.
 
 **Base64 upload to eSign.** `createfolder` takes either `fileUrls` or
 `base64FileString` + `inputType: "base64"`. A locally generated PDF has no
@@ -338,6 +347,36 @@ does not exist today.
 
 ---
 
+## The end of the chain
+
+`send` is not the last step. Once a person has signed in Foxit, `collect` pulls
+the signed PDF back and writes the last line of the ledger:
+
+```console
+$ consent-gate collect
+signed document retrieved: workspace/document.signed.pdf (115,567 bytes)
+  approved  sha256:09f512a1433c4139...
+  signed    sha256:076d0fd26151896e...
+
+$ consent-gate ledger
+#4   2026-08-19T16:34:20+00:00  document.rendered      09f512a1433c
+#5   2026-08-19T16:34:20+00:00  review.requested       0 blocking, 21 warnings
+#6   2026-08-19T16:34:34+00:00  human.authorised       K. Sato -> 09f512a1433c
+#7   2026-08-19T16:34:37+00:00  esign.dispatched       folder 35446725
+#8   2026-08-20T00:20:59+00:00  signature.collected    signed 076d0fd26151 <- approved 09f512a1433c
+
+chain: OK - 9 entries, chain intact
+```
+
+The two digests differ, and they should: signing adds content to the file. The
+ledger holds both, tied together by one folder id, so the chain reads
+*rendered → approved → dispatched → signed* with no gap a person has to take on
+trust. What this program does **not** claim is a cryptographic proof that the
+signed file contains the approved bytes — that is the signing platform's job,
+and its own signature is the evidence for it.
+
+---
+
 ## Status
 
 Built for the DevNetwork [API + Cloud + AI] Hackathon 2026 (submission deadline
@@ -352,16 +391,17 @@ Verified end to end against the live Foxit APIs on 19 August 2026:
 | eSign | `folders/createfolder` → **folder 35446153**, `folderStatus: DRAFT`, party recorded |
 | Gate | send before approval, wrong token, and one-byte edit after approval — **all three refused** |
 | Verification | the demo counterparty's domain does not resolve — **a blocking finding**, overridden only with a written reason recorded in the ledger |
-| Ledger | 8 entries, chain intact, `esign.dispatched` carrying the digest that was approved |
-| Tests | **43 passing**, no keys, no network, no third-party packages |
+| **Signature** | a second run went the whole way: sent for real, **signed by a human in Foxit**, and the signed PDF collected back — **115,567 bytes**, ledger closed at **9 entries** |
+| Ledger | chain intact; `signature.collected` carries both the approved digest and the signed one |
+| Tests | **46 passing**, no keys, no network, no third-party packages |
 
 `--draft-only` was used for the live eSign run, so the envelope exists in Foxit
 but no email was sent.
 
 The domain half of stage 3 runs and is covered by tests. The SerpApi half is
 implemented but has not been exercised against the live API — SerpApi's free
-tier requires phone verification, which we have not completed. The `anthropic`
-backend is written from the SDK documentation and has not been run. Both are
-stated here rather than implied to work.
+tier requires phone verification, which we chose not to complete. The
+`anthropic` backend is written from the SDK documentation and has not been run.
+Both are stated here rather than implied to work.
 
 MIT licensed.

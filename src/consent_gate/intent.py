@@ -46,28 +46,34 @@ def extract_intent(backend: Backend, prompt: str) -> DocumentRequest:
 
 
 def _to_request(raw: dict[str, Any], prompt: str) -> DocumentRequest:
+    # A model that has nothing to put in a field returns JSON null, and
+    # str(None) is the four-character string "None" - which then prints on the
+    # signature line of a real document as "Kazuma Sato - None".
+    def text(value: Any, default: str = "") -> str:
+        return default if value is None else str(value).strip()
+
     parties = [
         Party(
-            role=str(p.get("role", "counterparty")),
-            first_name=str(p.get("first_name", "")).strip(),
-            last_name=str(p.get("last_name", "")).strip(),
-            email=str(p.get("email", "")).strip(),
-            organisation=str(p.get("organisation", "")).strip(),
+            role=text(p.get("role"), "counterparty"),
+            first_name=text(p.get("first_name")),
+            last_name=text(p.get("last_name")),
+            email=text(p.get("email")),
+            organisation=text(p.get("organisation")),
         )
         for p in raw.get("parties", [])
     ]
     assumptions = [
         Assumption(
-            field=str(a.get("field", "")),
-            value=str(a.get("value", "")),
-            why=str(a.get("why", "")),
+            field=text(a.get("field")),
+            value=text(a.get("value"), "(left blank)"),
+            why=text(a.get("why")),
         )
         for a in raw.get("assumptions", [])
     ]
-    terms = {str(k): str(v) for k, v in (raw.get("terms") or {}).items()}
+    terms = {str(k): text(v) for k, v in (raw.get("terms") or {}).items()}
     request = DocumentRequest(
-        doc_type=str(raw.get("doc_type", "document")),
-        title=str(raw.get("title", "Agreement")),
+        doc_type=text(raw.get("doc_type"), "document"),
+        title=text(raw.get("title"), "Agreement"),
         parties=parties,
         terms=terms,
         assumptions=assumptions,
