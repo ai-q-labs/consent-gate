@@ -1,0 +1,82 @@
+[1/6] intent        (nebius: nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B)
+      mutual-nda: Mutual Non-Disclosure Agreement
+      5 value(s) the model supplied on your behalf
+[2/6] verify        Northwind Labs - domain only (no SERPAPI_API_KEY)
+      verified=False  1 source(s)
+      - dns: does not resolve (getaddrinfo failed)
+[3/6] draft         (nebius: nvidia/nemotron-3-super-120b-a12b)
+      8 clause(s)
+[4/6] render        Foxit PDF Services
+      workspace/document.pdf (54,313 bytes)
+[5/6] audit
+      second opinion (nebius: nvidia/Nemotron-3-Ultra-550b-a55b) - can add warnings, never clear a block
+  [BLOCK] COUNTERPARTY_NOT_FOUND   Northwind Labs
+          Northwind Labs could not be confirmed to exist. The signer's domain does not resolve (getaddrinfo failed).
+  [WARN ] UNREQUESTED_OBLIGATION   Parties and Effective Date
+          This clause creates an obligation that does not trace back to anything you asked for.
+  [WARN ] UNREQUESTED_OBLIGATION   Obligations of Receiving Party
+          This clause creates an obligation that does not trace back to anything you asked for.
+  [WARN ] UNREQUESTED_OBLIGATION   Term
+          This clause creates an obligation that does not trace back to anything you asked for.
+  [WARN ] UNREQUESTED_OBLIGATION   Return or Destruction of Confidential Information
+          This clause creates an obligation that does not trace back to anything you asked for.
+  [WARN ] UNREQUESTED_OBLIGATION   Remedies
+          This clause creates an obligation that does not trace back to anything you asked for.
+  [WARN ] UNREQUESTED_OBLIGATION   Governing Law
+          This clause creates an obligation that does not trace back to anything you asked for.
+  [WARN ] ASSUMPTION               first_name
+          first_name was assumed to be 'John' (No sender name provided, used common placeholder.).
+  [WARN ] ASSUMPTION               last_name
+          last_name was assumed to be 'Doe' (No sender last name provided, used common placeholder.).
+  [WARN ] ASSUMPTION               email
+          email was assumed to be 'john.doe@example.com' (No sender email provided, used placeholder.).
+  [WARN ] ASSUMPTION               organisation
+          organisation was assumed to be 'Acme Corp' (No sender organisation provided, used placeholder.).
+  [WARN ] ASSUMPTION               last_name
+          last_name was assumed to be '' (No counterparty last name provided, left blank.).
+  [WARN ] REVIEWER                 Parties and Effective Date
+          The clause assigns fixed roles of 'Disclosing Party' to John Doe and 'Receiving Party' to Alice, which contradicts the mutual nature of the NDA where both parties disclose and receive confidential information.
+  [WARN ] REVIEWER                 Obligations of Receiving Party
+          Obligations are imposed only on the 'Receiving Party' (defined as Alice), leaving John Doe without explicit obligations to protect Alice's confidential information.
+  [WARN ] REVIEWER                 Return or Destruction of Confidential Information
+          The return/destruction obligation applies only to the 'Receiving Party' (Alice), not mutually.
+  [WARN ] REVIEWER                 Definition of Confidential Information
+          The definition refers to information disclosed by 'a Party to the other Party' but the Parties clause defines only one disclosing party, creating ambiguity about whether Alice's disclosures are covered.
+  [info ] UNREQUESTED_CLAUSE       Definition of Confidential Information
+          This clause was added by the model and traces to nothing you said.
+  [info ] UNREQUESTED_CLAUSE       Exclusions
+          This clause was added by the model and traces to nothing you said.
+  [info ] REVIEWER                 Governing Law
+          The agreement specifies New York governing law without any indication in the request that this was agreed; this may be one-sided if parties are located elsewhere.
+  [info ] REVIEWER                 Parties and Effective Date
+          The effective date is written as 'September 1 2026' without a comma, while the preamble uses 'September 1, 2026'; inconsistency in date formatting.
+  [info ] REVIEWER                 document
+          The counterparty's last name is blank in the request and the draft uses only 'Alice'; consider including a placeholder or confirming the full legal name.
+      usage
+        nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B      1 call(s)     341 in /   2503 out  $0.0006
+        nvidia/nemotron-3-super-120b-a12b          1 call(s)     853 in /   3515 out  $0.0034
+        nvidia/Nemotron-3-Ultra-550b-a55b          1 call(s)    1370 in /   1806 out  $0.0068
+        total $0.0108
+[6/6] gate
+
+========================================================================
+  STOP. This is as far as the agent goes.
+========================================================================
+  document   workspace/document.pdf
+  sha256     5c5f6ef8518a1881b03e2a3c8b5ce2fc392706b8173d42b287398a4325e7b5a1
+  blocking   1    warnings 15
+
+  Read the document, then authorise it yourself:
+
+    consent-gate approve --doc 5c5f6ef8518a1881 --token <one-time token, printed once, redacted here> --approver "your name"
+
+  The token above is printed here and nowhere else - it is not written
+  to disk. The approval binds to these exact bytes; re-render the
+  document and it stops applying.
+========================================================================
+
+$ consent-gate send --draft-only
+refused: refusing to send: no human authorisation for sha256:5c5f6ef8518a...
+  file      workspace/document.pdf
+  Any edit to the document invalidates an earlier approval by design.
+(exit code 3)

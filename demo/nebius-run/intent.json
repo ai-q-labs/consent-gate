@@ -1,0 +1,53 @@
+{
+  "doc_type": "mutual-nda",
+  "title": "Mutual Non-Disclosure Agreement",
+  "parties": [
+    {
+      "role": "sender",
+      "first_name": "John",
+      "last_name": "Doe",
+      "email": "john.doe@example.com",
+      "organisation": "Acme Corp"
+    },
+    {
+      "role": "counterparty",
+      "first_name": "Alice",
+      "last_name": "",
+      "email": "alice@northwind-labs.example",
+      "organisation": "Northwind Labs"
+    }
+  ],
+  "terms": {
+    "effective_date": "September 1 2026",
+    "term_length": "two-year",
+    "subject": "logistics integration project"
+  },
+  "assumptions": [
+    {
+      "field": "first_name",
+      "value": "John",
+      "why": "No sender name provided, used common placeholder."
+    },
+    {
+      "field": "last_name",
+      "value": "Doe",
+      "why": "No sender last name provided, used common placeholder."
+    },
+    {
+      "field": "email",
+      "value": "john.doe@example.com",
+      "why": "No sender email provided, used placeholder."
+    },
+    {
+      "field": "organisation",
+      "value": "Acme Corp",
+      "why": "No sender organisation provided, used placeholder."
+    },
+    {
+      "field": "last_name",
+      "value": "",
+      "why": "No counterparty last name provided, left blank."
+    }
+  ],
+  "source_prompt": "Draft a mutual NDA with Northwind Labs and send it to alice@northwind-labs.example. Effective September 1 2026, two-year term, covering our logistics integration project."
+}

@@ -1,0 +1,47 @@
+{
+  "title": "Mutual Non-Disclosure Agreement",
+  "preamble": "This Mutual Non-Disclosure Agreement (\"Agreement\") is entered into as of September 1, 2026 by and between John Doe, of Acme Corp, and Alice, of Northwind Labs.",
+  "clauses": [
+    {
+      "heading": "Parties and Effective Date",
+      "text": "The Parties are John Doe of Acme Corp (\"Disclosing Party\") and Alice of Northwind Labs (\"Receiving Party\"), collectively referred to as the \"Parties.\" This Agreement shall become effective on September 1 2026 (\"Effective Date\").",
+      "traces_to": "September 1 2026"
+    },
+    {
+      "heading": "Definition of Confidential Information",
+      "text": "Confidential Information means any non-public information disclosed by a Party to the other Party, whether oral, written, or electronic, that relates to the logistics integration project, including but not limited to technical data, business plans, and proprietary processes.",
+      "traces_to": "logistics integration project"
+    },
+    {
+      "heading": "Obligations of Receiving Party",
+      "text": "Each Receiving Party shall (a) protect the Confidential Information using at least the same degree of care it uses to protect its own similar information, but no less than reasonable care; (b) use the Confidential Information solely for the purpose of performing the logistics integration project; and (c) not disclose the Confidential Information to any third party without the prior written consent of the disclosing Party, except as required by law.",
+      "traces_to": "mutual NDA"
+    },
+    {
+      "heading": "Exclusions",
+      "text": "Confidential Information does not include information that (i) is or becomes publicly known through no fault of the Receiving Party; (ii) was rightfully known by the Receiving Party prior to disclosure; (iii) is independently developed by the Receiving Party without reference to the Confidential Information; or (iv) is rightfully obtained from a third party without restriction.",
+      "traces_to": ""
+    },
+    {
+      "heading": "Term",
+      "text": "This Agreement shall remain in effect for a period of two (2) years from the Effective Date, unless earlier terminated by mutual written agreement of the Parties.",
+      "traces_to": "two-year term"
+    },
+    {
+      "heading": "Return or Destruction of Confidential Information",
+      "text": "Upon termination of this Agreement, or upon the disclosing Party's written request, each Receiving Party shall promptly return or destroy all Confidential Information and certify in writing that it has done so.",
+      "traces_to": ""
+    },
+    {
+      "heading": "Remedies",
+      "text": "The Parties acknowledge that monetary damages may be insufficient to remedy a breach of this Agreement and that the disclosing Party shall be entitled to seek injunctive relief, in addition to any other rights and remedies available at law or in equity.",
+      "traces_to": ""
+    },
+    {
+      "heading": "Governing Law",
+      "text": "This Agreement shall be governed by and construed in accordance with the laws of the State of New York, without regard to its conflict-of-law principles.",
+      "traces_to": ""
+    }
+  ],
+  "signature_block": "IN WITNESS WHEREOF, the Parties have executed this Mutual Non-Disclosure Agreement as of the Effective Date."
+}

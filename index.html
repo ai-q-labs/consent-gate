@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Consent Gate — recorded run on NVIDIA Nemotron</title>
+<meta name="description" content="A recorded run of Consent Gate on Nebius Token Factory: Nemotron Nano, Super and Ultra draft and review a contract, and the agent stops before it can be signed.">
+<style>
+:root {
+  --bg: #fbfaf7; --fg: #1d1d1b; --muted: #5d5b55; --line: #e2dfd7; --card: #ffffff;
+  --block: #b3261e; --warn: #8a5a00; --info: #3d5a80; --accent: #76b900; --code: #f1efe9;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #151513; --fg: #ecebe6; --muted: #a3a097; --line: #2f2e2a; --card: #1d1d1a;
+    --block: #ff8a80; --warn: #f2c14e; --info: #9cc0ff; --accent: #9be02a; --code: #23231f;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #151513; --fg: #ecebe6; --muted: #a3a097; --line: #2f2e2a; --card: #1d1d1a;
+  --block: #ff8a80; --warn: #f2c14e; --info: #9cc0ff; --accent: #9be02a; --code: #23231f;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg);
+  font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+main { max-width: 860px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { font-size: 1.9rem; line-height: 1.2; margin: 0 0 8px; }
+h2 { font-size: 1.2rem; margin: 40px 0 12px; }
+p { margin: 0 0 12px; }
+.lede { color: var(--muted); font-size: 1.05rem; }
+.note { border-left: 3px solid var(--accent); padding: 8px 12px; background: var(--card);
+  color: var(--muted); font-size: .92rem; margin: 20px 0; }
+.stages { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.stage { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
+.stage b { display: block; }
+.stage code { font-size: .8rem; word-break: break-all; color: var(--muted); }
+.catch { background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--warn);
+  border-radius: 8px; padding: 14px 16px; }
+table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; }
+.sev { font-weight: 700; font-size: .78rem; letter-spacing: .03em; white-space: nowrap; }
+.sev.block { color: var(--block); } .sev.warn { color: var(--warn); } .sev.info { color: var(--info); }
+.tablewrap { overflow-x: auto; }
+pre { background: var(--code); border-radius: 8px; padding: 14px; overflow-x: auto;
+  font-size: .78rem; line-height: 1.45; max-height: 460px; }
+.links a { display: inline-block; margin: 0 14px 8px 0; color: var(--fg); }
+.num { font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Consent Gate on NVIDIA Nemotron</h1>
+  <p class="lede">One sentence in. A drafted, rendered, twice-audited contract out. Then the agent stops — it is structurally unable to send the document for signature until a person approves those exact bytes.</p>
+
+  <div class="note">This page shows a <b>recorded run</b> from 2026-09-26, not a live service: every figure below is copied from that run's own files, which are linked at the bottom. To run it yourself, clone the repository — the test suite and a keyless mock pipeline need no credentials.</div>
+
+  <h2>The prompt</h2>
+  <pre>consent-gate draft "Draft a mutual NDA with Northwind Labs and send it to
+                    alice@northwind-labs.example. Effective September 1 2026,
+                    two-year term, covering our logistics integration project." --backend nebius</pre>
+
+  <h2>Three Nemotron models, sized to the job</h2>
+  <div class="stages">
+    <div class="stage"><b>Intent</b><code>nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B</code></div>
+    <div class="stage"><b>Draft</b><code>nvidia/nemotron-3-super-120b-a12b</code></div>
+    <div class="stage"><b>Second opinion</b><code>nvidia/Nemotron-3-Ultra-550b-a55b</code></div>
+  </div>
+  <p style="margin-top:12px">All three run on Nebius Token Factory. The PDF is rendered by Foxit PDF Services. The whole run cost <b class="num" id="cost">$0.0108</b>.</p>
+
+  <h2>What the second opinion caught</h2>
+  <div class="catch">
+    <p><b>Ultra, reviewing a draft it did not write:</b> the clause "assigns fixed roles of 'Disclosing Party' to John Doe and 'Receiving Party' to Alice, which contradicts the mutual nature of the NDA" — and it followed the defect through the obligations and the return-of-materials clause.</p>
+    <p style="margin:0">None of the rule-based checks is written to see that. The reviewer is fenced in: it can add warnings, but it cannot raise a block, clear one, or approve anything. The rule-based <b>COUNTERPARTY_NOT_FOUND</b> block stood regardless.</p>
+  </div>
+
+  <h2>Every finding from the run</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Severity</th><th>Code</th><th>Where</th><th>Message</th></tr></thead>
+      <tbody id="findings"><tr><td colspan="4">Loading audit.json…</td></tr></tbody>
+    </table>
+  </div>
+
+  <h2>Then it stops</h2>
+  <p>The agent prints a one-time approval token and exits. Trying to send without a human approval is refused:</p>
+  <pre>$ consent-gate send --draft-only
+refused: refusing to send: no human authorisation for sha256:5c5f6ef8518a...
+  Any edit to the document invalidates an earlier approval by design.
+(exit code 3)</pre>
+
+  <h2>Full transcript</h2>
+  <pre id="transcript">Loading transcript.txt…</pre>
+
+  <h2>The run's own files</h2>
+  <p class="links">
+    <a href="demo/nebius-run/document.pdf">document.pdf</a>
+    <a href="demo/nebius-run/audit.json">audit.json</a>
+    <a href="demo/nebius-run/draft.json">draft.json</a>
+    <a href="demo/nebius-run/intent.json">intent.json</a>
+    <a href="demo/nebius-run/ledger.jsonl">ledger.jsonl</a>
+    <a href="demo/nebius-run/transcript.txt">transcript.txt</a>
+    <a href="https://github.com/ai-q-labs/consent-gate">Source on GitHub (MIT)</a>
+  </p>
+</main>
+<script>
+const base = "demo/nebius-run/";
+const order = { block: 0, warn: 1, info: 2 };
+fetch(base + "audit.json").then(r => r.json()).then(report => {
+  const rows = [...report.findings].sort((a, b) => (order[a.severity] ?? 3) - (order[b.severity] ?? 3));
+  const body = document.getElementById("findings");
+  body.textContent = "";
+  for (const f of rows) {
+    const tr = document.createElement("tr");
+    const cells = [f.severity.toUpperCase(), f.code, f.where, f.message];
+    cells.forEach((text, i) => {
+      const td = document.createElement("td");
+      td.textContent = text;
+      if (i === 0) td.className = "sev " + f.severity;
+      tr.appendChild(td);
+    });
+    body.appendChild(tr);
+  }
+}).catch(() => { document.getElementById("findings").innerHTML = '<tr><td colspan="4">Could not load audit.json — open it from the links below.</td></tr>'; });
+fetch(base + "transcript.txt").then(r => r.text()).then(t => { document.getElementById("transcript").textContent = t; })
+  .catch(() => { document.getElementById("transcript").textContent = "Could not load transcript.txt — open it from the links below."; });
+</script>
+</body>
+</html>

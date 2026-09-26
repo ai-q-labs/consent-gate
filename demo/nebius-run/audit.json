@@ -1,0 +1,132 @@
+{
+  "document_sha256": "5c5f6ef8518a1881b03e2a3c8b5ce2fc392706b8173d42b287398a4325e7b5a1",
+  "findings": [
+    {
+      "severity": "warn",
+      "code": "UNREQUESTED_OBLIGATION",
+      "message": "This clause creates an obligation that does not trace back to anything you asked for.",
+      "where": "Parties and Effective Date"
+    },
+    {
+      "severity": "info",
+      "code": "UNREQUESTED_CLAUSE",
+      "message": "This clause was added by the model and traces to nothing you said.",
+      "where": "Definition of Confidential Information"
+    },
+    {
+      "severity": "warn",
+      "code": "UNREQUESTED_OBLIGATION",
+      "message": "This clause creates an obligation that does not trace back to anything you asked for.",
+      "where": "Obligations of Receiving Party"
+    },
+    {
+      "severity": "info",
+      "code": "UNREQUESTED_CLAUSE",
+      "message": "This clause was added by the model and traces to nothing you said.",
+      "where": "Exclusions"
+    },
+    {
+      "severity": "warn",
+      "code": "UNREQUESTED_OBLIGATION",
+      "message": "This clause creates an obligation that does not trace back to anything you asked for.",
+      "where": "Term"
+    },
+    {
+      "severity": "warn",
+      "code": "UNREQUESTED_OBLIGATION",
+      "message": "This clause creates an obligation that does not trace back to anything you asked for.",
+      "where": "Return or Destruction of Confidential Information"
+    },
+    {
+      "severity": "warn",
+      "code": "UNREQUESTED_OBLIGATION",
+      "message": "This clause creates an obligation that does not trace back to anything you asked for.",
+      "where": "Remedies"
+    },
+    {
+      "severity": "warn",
+      "code": "UNREQUESTED_OBLIGATION",
+      "message": "This clause creates an obligation that does not trace back to anything you asked for.",
+      "where": "Governing Law"
+    },
+    {
+      "severity": "warn",
+      "code": "ASSUMPTION",
+      "message": "first_name was assumed to be 'John' (No sender name provided, used common placeholder.).",
+      "where": "first_name"
+    },
+    {
+      "severity": "warn",
+      "code": "ASSUMPTION",
+      "message": "last_name was assumed to be 'Doe' (No sender last name provided, used common placeholder.).",
+      "where": "last_name"
+    },
+    {
+      "severity": "warn",
+      "code": "ASSUMPTION",
+      "message": "email was assumed to be 'john.doe@example.com' (No sender email provided, used placeholder.).",
+      "where": "email"
+    },
+    {
+      "severity": "warn",
+      "code": "ASSUMPTION",
+      "message": "organisation was assumed to be 'Acme Corp' (No sender organisation provided, used placeholder.).",
+      "where": "organisation"
+    },
+    {
+      "severity": "warn",
+      "code": "ASSUMPTION",
+      "message": "last_name was assumed to be '' (No counterparty last name provided, left blank.).",
+      "where": "last_name"
+    },
+    {
+      "severity": "block",
+      "code": "COUNTERPARTY_NOT_FOUND",
+      "message": "Northwind Labs could not be confirmed to exist. The signer's domain does not resolve (getaddrinfo failed).",
+      "where": "Northwind Labs"
+    },
+    {
+      "severity": "warn",
+      "code": "REVIEWER",
+      "message": "The clause assigns fixed roles of 'Disclosing Party' to John Doe and 'Receiving Party' to Alice, which contradicts the mutual nature of the NDA where both parties disclose and receive confidential information.",
+      "where": "Parties and Effective Date"
+    },
+    {
+      "severity": "warn",
+      "code": "REVIEWER",
+      "message": "Obligations are imposed only on the 'Receiving Party' (defined as Alice), leaving John Doe without explicit obligations to protect Alice's confidential information.",
+      "where": "Obligations of Receiving Party"
+    },
+    {
+      "severity": "warn",
+      "code": "REVIEWER",
+      "message": "The return/destruction obligation applies only to the 'Receiving Party' (Alice), not mutually.",
+      "where": "Return or Destruction of Confidential Information"
+    },
+    {
+      "severity": "warn",
+      "code": "REVIEWER",
+      "message": "The definition refers to information disclosed by 'a Party to the other Party' but the Parties clause defines only one disclosing party, creating ambiguity about whether Alice's disclosures are covered.",
+      "where": "Definition of Confidential Information"
+    },
+    {
+      "severity": "info",
+      "code": "REVIEWER",
+      "message": "The agreement specifies New York governing law without any indication in the request that this was agreed; this may be one-sided if parties are located elsewhere.",
+      "where": "Governing Law"
+    },
+    {
+      "severity": "info",
+      "code": "REVIEWER",
+      "message": "The effective date is written as 'September 1 2026' without a comma, while the preamble uses 'September 1, 2026'; inconsistency in date formatting.",
+      "where": "Parties and Effective Date"
+    },
+    {
+      "severity": "info",
+      "code": "REVIEWER",
+      "message": "The counterparty's last name is blank in the request and the draft uses only 'Alice'; consider including a placeholder or confirming the full legal name.",
+      "where": "document"
+    }
+  ],
+  "checked_at": "2026-09-26T02:12:24+00:00"
+}
