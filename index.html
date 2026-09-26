@@ -46,21 +46,27 @@ pre { background: var(--code); border-radius: 8px; padding: 14px; overflow-x: au
   font-size: .78rem; line-height: 1.45; max-height: 460px; }
 .links a { display: inline-block; margin: 0 14px 8px 0; color: var(--fg); }
 .num { font-variant-numeric: tabular-nums; }
+#tourbtn { position: fixed; right: 16px; bottom: 16px; padding: 12px 18px; border-radius: 8px;
+  border: 0; background: var(--accent); color: #111; font-weight: 700; cursor: pointer; display: none; }
+#caption { position: fixed; left: 16px; right: 16px; bottom: 16px; max-width: 828px; margin: 0 auto;
+  background: rgba(0,0,0,.78); color: #fff; padding: 10px 14px; border-radius: 8px; font-size: .95rem;
+  line-height: 1.45; display: none; }
+.focus { outline: 3px solid var(--accent); outline-offset: 6px; border-radius: 4px; }
 </style>
 </head>
 <body>
 <main>
-  <h1>Consent Gate on NVIDIA Nemotron</h1>
+  <h1 id="top">Consent Gate on NVIDIA Nemotron</h1>
   <p class="lede">One sentence in. A drafted, rendered, twice-audited contract out. Then the agent stops — it is structurally unable to send the document for signature until a person approves those exact bytes.</p>
 
   <div class="note">This page shows a <b>recorded run</b> from 2026-09-26, not a live service: every figure below is copied from that run's own files, which are linked at the bottom. To run it yourself, clone the repository — the test suite and a keyless mock pipeline need no credentials.</div>
 
-  <h2>The prompt</h2>
+  <h2 id="prompt">The prompt</h2>
   <pre>consent-gate draft "Draft a mutual NDA with Northwind Labs and send it to
                     alice@northwind-labs.example. Effective September 1 2026,
                     two-year term, covering our logistics integration project." --backend nebius</pre>
 
-  <h2>Three Nemotron models, sized to the job</h2>
+  <h2 id="models">Three Nemotron models, sized to the job</h2>
   <div class="stages">
     <div class="stage"><b>Intent</b><code>nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B</code></div>
     <div class="stage"><b>Draft</b><code>nvidia/nemotron-3-super-120b-a12b</code></div>
@@ -68,13 +74,13 @@ pre { background: var(--code); border-radius: 8px; padding: 14px; overflow-x: au
   </div>
   <p style="margin-top:12px">All three run on Nebius Token Factory. The PDF is rendered by Foxit PDF Services. The whole run cost <b class="num" id="cost">$0.0108</b>.</p>
 
-  <h2>What the second opinion caught</h2>
+  <h2 id="catch">What the second opinion caught</h2>
   <div class="catch">
     <p><b>Ultra, reviewing a draft it did not write:</b> the clause "assigns fixed roles of 'Disclosing Party' to John Doe and 'Receiving Party' to Alice, which contradicts the mutual nature of the NDA" — and it followed the defect through the obligations and the return-of-materials clause.</p>
     <p style="margin:0">None of the rule-based checks is written to see that. The reviewer is fenced in: it can add warnings, but it cannot raise a block, clear one, or approve anything. The rule-based <b>COUNTERPARTY_NOT_FOUND</b> block stood regardless.</p>
   </div>
 
-  <h2>Every finding from the run</h2>
+  <h2 id="findings-h">Every finding from the run</h2>
   <div class="tablewrap">
     <table>
       <thead><tr><th>Severity</th><th>Code</th><th>Where</th><th>Message</th></tr></thead>
@@ -82,7 +88,7 @@ pre { background: var(--code); border-radius: 8px; padding: 14px; overflow-x: au
     </table>
   </div>
 
-  <h2>Then it stops</h2>
+  <h2 id="stops">Then it stops</h2>
   <p>The agent prints a one-time approval token and exits. Trying to send without a human approval is refused:</p>
   <pre>$ consent-gate send --draft-only
 refused: refusing to send: no human authorisation for sha256:5c5f6ef8518a...
@@ -92,7 +98,7 @@ refused: refusing to send: no human authorisation for sha256:5c5f6ef8518a...
   <h2>Full transcript</h2>
   <pre id="transcript">Loading transcript.txt…</pre>
 
-  <h2>The run's own files</h2>
+  <h2 id="files">The run's own files</h2>
   <p class="links">
     <a href="demo/nebius-run/document.pdf">document.pdf</a>
     <a href="demo/nebius-run/audit.json">audit.json</a>
@@ -124,6 +130,33 @@ fetch(base + "audit.json").then(r => r.json()).then(report => {
 }).catch(() => { document.getElementById("findings").innerHTML = '<tr><td colspan="4">Could not load audit.json — open it from the links below.</td></tr>'; });
 fetch(base + "transcript.txt").then(r => r.text()).then(t => { document.getElementById("transcript").textContent = t; })
   .catch(() => { document.getElementById("transcript").textContent = "Could not load transcript.txt — open it from the links below."; });
+</script>
+<button id="tourbtn" type="button">Start narrated tour</button>
+<div id="caption" aria-live="polite"></div>
+<script>
+// Narrated tour for the demo video: ?tour=1 shows a start button; each narration
+// segment scrolls its section into view, plays, and moves on. Captions mirror the audio.
+(() => {
+  if (!new URLSearchParams(location.search).has("tour")) return;
+  const btn = document.getElementById("tourbtn"), cap = document.getElementById("caption");
+  btn.style.display = "block";
+  const target = id => document.getElementById(id === "findings" ? "findings-h" : id);
+  btn.addEventListener("click", async () => {
+    btn.style.display = "none";
+    const segs = await fetch("demo/narration/manifest.json").then(r => r.json());
+    for (const seg of segs) {
+      const el = target(seg.target);
+      document.querySelectorAll(".focus").forEach(e => e.classList.remove("focus"));
+      if (el) { el.scrollIntoView({ behavior: "smooth", block: "start" }); el.classList.add("focus"); }
+      cap.textContent = seg.text; cap.style.display = "block";
+      const audio = new Audio("demo/narration/" + seg.file);
+      await new Promise(res => { audio.onended = res; audio.onerror = res; audio.play().catch(res); });
+      await new Promise(r => setTimeout(r, 400));
+    }
+    cap.style.display = "none";
+    document.querySelectorAll(".focus").forEach(e => e.classList.remove("focus"));
+  });
+})();
 </script>
 </body>
 </html>

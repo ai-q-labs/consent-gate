@@ -1,0 +1,44 @@
+[
+ {
+  "file": "01.wav",
+  "target": "top",
+  "seconds": 20.46,
+  "text": "This is Consent Gate, running on NVIDIA Nemotron through Nebius Token Factory. AI agents can now draft contracts. The dangerous step is the last one: sending a document to be signed. Consent Gate lets an agent do everything up to that point, and makes the last step impossible without a person."
+ },
+ {
+  "file": "02.wav",
+  "target": "prompt",
+  "seconds": 12.61,
+  "text": "Here is the whole input: one sentence asking for a mutual non-disclosure agreement. What you are about to see is a recorded run from September twenty sixth, rendered from that run's own files."
+ },
+ {
+  "file": "03.wav",
+  "target": "models",
+  "seconds": 32.09,
+  "text": "The pipeline uses three Nemotron models, each sized to its job. Nemotron Nano reads the sentence into structured intent, where speed matters more than depth. Nemotron Super drafts the clauses. And Nemotron Ultra, the largest, gives an independent second opinion on a draft it did not write. All three run on Nebius Token Factory, through its OpenAI compatible API, with a client written in the Python standard library. The whole run cost about one cent."
+ },
+ {
+  "file": "04.wav",
+  "target": "catch",
+  "seconds": 25.19,
+  "text": "Here is why the second opinion matters. Ultra noticed that the draft named one side the disclosing party and the other the receiving party, in what the request called a mutual agreement. That is a real defect, and none of the rule based checks is written to see it. But the reviewer is fenced in. It can add warnings. It cannot raise a block, clear one, or approve anything."
+ },
+ {
+  "file": "05.wav",
+  "target": "findings",
+  "seconds": 18.93,
+  "text": "These are all twenty one findings from the run. At the top is the one that stops everything: the counterparty's domain does not resolve, so the company could not be confirmed to exist. Below it, every value the model supplied on the user's behalf is listed, so nothing is silently assumed."
+ },
+ {
+  "file": "06.wav",
+  "target": "stops",
+  "seconds": 17.24,
+  "text": "Then the agent stops. It prints a one time approval token that is never written to disk, and exits. Trying to send the document without a human approval is refused. An approval binds to the exact bytes of the PDF, so any edit invalidates it."
+ },
+ {
+  "file": "07.wav",
+  "target": "files",
+  "seconds": 21.17,
+  "text": "Every file from the run is linked here: the PDF, the audit, the tamper evident ledger that records which model ran which stage, and the full transcript. The source is on GitHub under the MIT licence, with sixty four tests. Consent Gate: let the agent draft. Keep the signature human."
+ }
+]
