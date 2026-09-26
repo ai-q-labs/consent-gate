@@ -34,6 +34,8 @@ from .llm import (
     Backend,
     LLMError,
     get_backend,
+    nebius_prices,
+    usage_summary,
 )
 from .review import second_opinion
 from .models import (
@@ -134,6 +136,18 @@ def _stage_models(stages: dict[str, Backend]) -> dict[str, str]:
     return {stage: _label(b) for stage, b in stages.items()}
 
 
+def _print_usage(summary: dict) -> None:
+    print("      usage")
+    for model, row in summary["models"].items():
+        usd = "price unknown" if row["usd"] is None else f"${row['usd']:.4f}"
+        print(
+            f"        {model:<42} {row['calls']} call(s)  "
+            f"{row['prompt_tokens']:>6} in / {row['completion_tokens']:>6} out  {usd}"
+        )
+    total = summary["total_usd"]
+    print(f"        total {'unknown' if total is None else f'${total:.4f}'}")
+
+
 def cmd_draft(args: argparse.Namespace) -> int:
     workspace = _workspace(args)
     ledger = _ledger(args)
@@ -215,6 +229,12 @@ def cmd_draft(args: argparse.Namespace) -> int:
         )
     _write_json(workspace / "audit.json", report.to_json())
     _print_findings(report.findings)
+
+    calls = [c for b in {id(b): b for b in stages.values()}.values() for c in getattr(b, "calls", [])]
+    if calls:
+        summary = usage_summary(calls, nebius_prices())
+        ledger.append("run.usage", summary)
+        _print_usage(summary)
 
     print("[6/6] gate")
     packet = gate.open_review(pdf_path, report)

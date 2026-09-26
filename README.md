@@ -216,6 +216,12 @@ the regex rules is written to see, and exactly the kind of thing a signer
 would miss on a skim. The deterministic `COUNTERPARTY_NOT_FOUND` block stood
 regardless of what the reviewer said.
 
+Each run ends with a usage line — tokens and dollars per model, priced live
+from Token Factory's own model list and written to the ledger as `run.usage`.
+One full run of the NDA prompt above cost **$0.0101**: Nano $0.0005, Super
+$0.0034, Ultra $0.0063. The largest model is the most expensive line and is
+still about a cent, which is the argument for spending it on the reviewer.
+
 The backend uses the standard library only (no SDK). The key comes from
 `NEBIUS_API_KEY`; the three model ids can be overridden with
 `CONSENT_GATE_NEBIUS_FAST_MODEL`, `CONSENT_GATE_NEBIUS_MODEL` and

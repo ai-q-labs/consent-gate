@@ -285,6 +285,8 @@ class NebiusBackend(Backend):
         self.model = model or os.environ.get("CONSENT_GATE_NEBIUS_MODEL", NEBIUS_DEFAULT_MODEL)
         self.max_tokens = max_tokens
         self.timeout = timeout
+        # One entry per call, from the usage block Token Factory returns.
+        self.calls: list[dict[str, Any]] = []
 
     @staticmethod
     def _api_key() -> str:
@@ -327,6 +329,14 @@ class NebiusBackend(Backend):
             raise LLMError(f"Token Factory returned HTTP {exc.code}: {detail}") from exc
         except urllib.error.URLError as exc:
             raise LLMError(f"could not reach Token Factory: {exc.reason}") from exc
+        usage = data.get("usage") or {}
+        self.calls.append(
+            {
+                "model": self.model,
+                "prompt_tokens": int(usage.get("prompt_tokens") or 0),
+                "completion_tokens": int(usage.get("completion_tokens") or 0),
+            }
+        )
         try:
             text = data["choices"][0]["message"]["content"] or ""
         except (KeyError, IndexError, TypeError) as exc:
@@ -334,6 +344,58 @@ class NebiusBackend(Backend):
         # Reasoning models may emit a <think> block before the answer.
         text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
         return extract_json(text)
+
+
+def nebius_prices(timeout: int = 30) -> dict[str, tuple[float, float]]:
+    """USD per token (prompt, completion) for every model, as Token Factory reports it.
+
+    Read live from ``/v1/models?verbose=true`` rather than hard-coded, so the
+    cost line never drifts from the price list. Returns {} if it cannot be read.
+    """
+    import urllib.request
+
+    try:
+        request = urllib.request.Request(
+            f"{NEBIUS_BASE_URL}/models?verbose=true",
+            headers={"Authorization": f"Bearer {NebiusBackend._api_key()}"},
+        )
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            data = json.loads(response.read().decode("utf-8"))
+    except Exception:  # noqa: BLE001 - the cost line is a courtesy, never a failure
+        return {}
+    prices: dict[str, tuple[float, float]] = {}
+    for model in data.get("data", []):
+        pricing = model.get("pricing") or {}
+        try:
+            prices[model["id"]] = (float(pricing["prompt"]), float(pricing["completion"]))
+        except (KeyError, TypeError, ValueError):
+            continue
+    return prices
+
+
+def usage_summary(
+    calls: list[dict[str, Any]], prices: dict[str, tuple[float, float]]
+) -> dict[str, Any]:
+    """Tokens and USD per model for one run. Cost is None where no price is known."""
+    per_model: dict[str, dict[str, Any]] = {}
+    for call in calls:
+        row = per_model.setdefault(
+            call["model"], {"calls": 0, "prompt_tokens": 0, "completion_tokens": 0}
+        )
+        row["calls"] += 1
+        row["prompt_tokens"] += call["prompt_tokens"]
+        row["completion_tokens"] += call["completion_tokens"]
+    total: float | None = 0.0
+    for model, row in per_model.items():
+        price = prices.get(model)
+        if price is None:
+            row["usd"] = None
+            total = None
+            continue
+        row["usd"] = row["prompt_tokens"] * price[0] + row["completion_tokens"] * price[1]
+        if total is not None:
+            total += row["usd"]
+    return {"models": per_model, "total_usd": total}
 
 
 # --------------------------------------------------------------------------
