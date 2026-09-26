@@ -28,7 +28,14 @@ from .foxit import Credentials, ESign, FoxitError, PdfServices, party_payload
 from .gate import ConsentGate, GateError, sha256_file
 from .intent import extract_intent
 from .ledger import Ledger
-from .llm import LLMError, get_backend
+from .llm import (
+    NEBIUS_FAST_MODEL,
+    NEBIUS_REVIEW_MODEL,
+    Backend,
+    LLMError,
+    get_backend,
+)
+from .review import second_opinion
 from .models import (
     AuditReport,
     DocumentRequest,
@@ -102,16 +109,46 @@ def _rehydrate_request(data: dict) -> DocumentRequest:
 # draft
 
 
+def _stage_backends(name: str) -> dict[str, Backend]:
+    """One backend per stage.  Only Nebius splits them across model sizes."""
+    if name != "nebius":
+        one = get_backend(name)
+        return {"intent": one, "draft": one, "review": one}
+    return {
+        "intent": get_backend(
+            "nebius", model=os.environ.get("CONSENT_GATE_NEBIUS_FAST_MODEL", NEBIUS_FAST_MODEL)
+        ),
+        "draft": get_backend("nebius"),
+        "review": get_backend(
+            "nebius", model=os.environ.get("CONSENT_GATE_NEBIUS_REVIEW_MODEL", NEBIUS_REVIEW_MODEL)
+        ),
+    }
+
+
+def _label(backend: Backend) -> str:
+    model = getattr(backend, "model", "")
+    return f"{backend.name}: {model}" if model else backend.name
+
+
+def _stage_models(stages: dict[str, Backend]) -> dict[str, str]:
+    return {stage: _label(b) for stage, b in stages.items()}
+
+
 def cmd_draft(args: argparse.Namespace) -> int:
     workspace = _workspace(args)
     ledger = _ledger(args)
     gate = ConsentGate(ledger)
-    backend = get_backend(args.backend)
+    stages = _stage_backends(args.backend)
+    backend = stages["draft"]
+    review_on = args.second_opinion if args.second_opinion is not None else args.backend == "nebius"
 
-    ledger.append("run.started", {"prompt": args.prompt, "backend": backend.name})
+    ledger.append(
+        "run.started",
+        {"prompt": args.prompt, "backend": backend.name, "models": _stage_models(stages)},
+    )
 
-    print(f"[1/6] intent        ({backend.name})")
-    request = extract_intent(backend, args.prompt)
+    print(f"[1/6] intent        ({_label(stages['intent'])})")
+    request = extract_intent(stages["intent"], args.prompt)
     _write_json(workspace / "intent.json", request.to_json())
     ledger.append("intent.extracted", request.to_json())
     print(f"      {request.doc_type}: {request.title}")
@@ -141,7 +178,7 @@ def cmd_draft(args: argparse.Namespace) -> int:
     else:
         print("[2/6] verify        skipped (disabled)")
 
-    print("[3/6] draft")
+    print(f"[3/6] draft         ({_label(backend)})")
     document = draft_document(backend, request, verification)
     _write_json(workspace / "draft.json", document.to_json())
     ledger.append("draft.written", document.to_json())
@@ -166,6 +203,16 @@ def cmd_draft(args: argparse.Namespace) -> int:
 
     print("[5/6] audit")
     report = run_audit(document, request, pdf_path.read_bytes(), verification)
+    if review_on:
+        reviewer = stages["review"]
+        print(f"      second opinion ({_label(reviewer)}) - can add warnings, never clear a block")
+        extra = second_opinion(reviewer, request, document)
+        ledger.append("review.second_opinion", {"model": _label(reviewer), "findings": [f.to_json() for f in extra]})
+        report = AuditReport(
+            document_sha256=report.document_sha256,
+            findings=[*report.findings, *extra],
+            checked_at=report.checked_at,
+        )
     _write_json(workspace / "audit.json", report.to_json())
     _print_findings(report.findings)
 
@@ -399,7 +446,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_draft.add_argument(
         "--backend",
         default=os.environ.get("CONSENT_GATE_BACKEND", "claude-code"),
-        choices=["claude-code", "anthropic", "mock"],
+        choices=["claude-code", "anthropic", "nebius", "mock"],
     )
     p_draft.add_argument(
         "--no-verify-counterparty",
@@ -411,6 +458,13 @@ def build_parser() -> argparse.ArgumentParser:
         "--offline",
         action="store_true",
         help="skip Foxit PDF Services and hash the HTML instead (for testing the gate)",
+    )
+    p_draft.add_argument(
+        "--second-opinion",
+        dest="second_opinion",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="have a separate model review the draft (default: on for --backend nebius)",
     )
     p_draft.set_defaults(func=cmd_draft, verify_counterparty=True)
 

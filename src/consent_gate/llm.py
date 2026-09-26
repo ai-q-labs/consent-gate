@@ -254,10 +254,95 @@ class AnthropicBackend(Backend):
 
 # --------------------------------------------------------------------------
 
+
+NEBIUS_BASE_URL = "https://api.tokenfactory.nebius.com/v1"
+# Three tiers, used for three different jobs (see cli._stage_backends):
+#   fast    - reading the prompt into structured intent; a small model is enough
+#   default - drafting the clauses
+#   review  - the independent second opinion; the largest model, because it has
+#             to catch what the drafter did not
+NEBIUS_DEFAULT_MODEL = "nvidia/nemotron-3-super-120b-a12b"
+NEBIUS_FAST_MODEL = "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+NEBIUS_REVIEW_MODEL = "nvidia/Nemotron-3-Ultra-550b-a55b"
+
+
+class NebiusBackend(Backend):
+    """NVIDIA Nemotron on Nebius Token Factory (OpenAI-compatible endpoint).
+
+    Standard library only - no SDK to install. The key resolves from
+    ``NEBIUS_API_KEY`` or, failing that, ``~/.secrets/nebius/api_key.txt``;
+    nothing is read from this repo.
+    """
+
+    name = "nebius"
+
+    def __init__(
+        self,
+        model: str | None = None,
+        max_tokens: int = 16000,
+        timeout: int = 300,
+    ) -> None:
+        self.model = model or os.environ.get("CONSENT_GATE_NEBIUS_MODEL", NEBIUS_DEFAULT_MODEL)
+        self.max_tokens = max_tokens
+        self.timeout = timeout
+
+    @staticmethod
+    def _api_key() -> str:
+        key = os.environ.get("NEBIUS_API_KEY", "").strip()
+        if not key:
+            path = Path.home() / ".secrets" / "nebius" / "api_key.txt"
+            if path.exists():
+                key = path.read_text(encoding="utf-8").strip()
+        if not key:
+            raise LLMError("the nebius backend needs NEBIUS_API_KEY (or ~/.secrets/nebius/api_key.txt)")
+        return key
+
+    def complete_json(self, instruction: str, payload: str) -> dict[str, Any]:
+        import urllib.error
+        import urllib.request
+
+        body = {
+            "model": self.model,
+            "max_tokens": self.max_tokens,
+            "temperature": 0.2,
+            "messages": [
+                {"role": "system", "content": f"{instruction}\n\n{JSON_CONTRACT} Always answer in English."},
+                {"role": "user", "content": payload},
+            ],
+        }
+        request = urllib.request.Request(
+            f"{NEBIUS_BASE_URL}/chat/completions",
+            data=json.dumps(body).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {self._api_key()}",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=self.timeout) as response:
+                data = json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", "replace")[:400]
+            raise LLMError(f"Token Factory returned HTTP {exc.code}: {detail}") from exc
+        except urllib.error.URLError as exc:
+            raise LLMError(f"could not reach Token Factory: {exc.reason}") from exc
+        try:
+            text = data["choices"][0]["message"]["content"] or ""
+        except (KeyError, IndexError, TypeError) as exc:
+            raise LLMError(f"unexpected Token Factory response shape: {str(data)[:300]}") from exc
+        # Reasoning models may emit a <think> block before the answer.
+        text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
+        return extract_json(text)
+
+
+# --------------------------------------------------------------------------
+
 BACKENDS = {
     "mock": MockBackend,
     "claude-code": ClaudeCodeBackend,
     "anthropic": AnthropicBackend,
+    "nebius": NebiusBackend,
 }
 
 

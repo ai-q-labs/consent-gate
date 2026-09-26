@@ -181,6 +181,47 @@ depends on whether the clause contains binding language.
 Blocking findings stop `approve` unless the operator supplies
 `--override-reason`, which is recorded in the ledger next to their name.
 
+**Second opinion** (`--backend nebius`, on by default there) — a *different*,
+larger model reads the draft against the request after the rules have run.
+The rules only know the patterns they were written for; a model that did not
+write the draft catches the clause that is legal-looking but wrong for *this*
+request. It is fenced in on purpose:
+
+| Code | Severity | Meaning |
+|---|---|---|
+| `REVIEWER` | warn / info | a concern raised by the reviewing model; a `block` it asks for is downgraded to `warn` |
+| `REVIEWER_UNAVAILABLE` | info | the reviewer did not answer; the run carries on, the gap is reported |
+
+It can add findings. It cannot raise a block, clear one, or approve anything —
+blocks come only from rules a person can read. Its answer is written to the
+ledger as `review.second_opinion` with the model that gave it.
+
+---
+
+## Running on NVIDIA Nemotron via Nebius Token Factory
+
+`--backend nebius` splits the pipeline across three Nemotron models by what
+each step actually needs:
+
+| Stage | Model | Why this size |
+|---|---|---|
+| intent | `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B` | turning one sentence into structured fields; latency matters more than depth |
+| draft | `nvidia/nemotron-3-super-120b-a12b` | writing the clauses |
+| second opinion | `nvidia/Nemotron-3-Ultra-550b-a55b` | it has to catch what the drafter missed, so it gets the most reasoning |
+
+In our run on the same one-sentence prompt, the Ultra reviewer flagged that the
+preamble labelled one side as "Disclosing Party" and the other as "Receiving
+Party" in what the request called a *mutual* NDA — a real defect that none of
+the regex rules is written to see, and exactly the kind of thing a signer
+would miss on a skim. The deterministic `COUNTERPARTY_NOT_FOUND` block stood
+regardless of what the reviewer said.
+
+The backend uses the standard library only (no SDK). The key comes from
+`NEBIUS_API_KEY`; the three model ids can be overridden with
+`CONSENT_GATE_NEBIUS_FAST_MODEL`, `CONSENT_GATE_NEBIUS_MODEL` and
+`CONSENT_GATE_NEBIUS_REVIEW_MODEL`, and the ledger records which model did
+which stage.
+
 ---
 
 ## Counterparty verification
@@ -267,6 +308,7 @@ consent-gate ledger
 | `FOXIT_ESIGN_PREFIX` | — | `/esign/api/v1` by default; falls back to `/api` on 404 |
 | `SERPAPI_API_KEY` | stage 3, search half | optional; the domain check runs without it, and its absence is reported rather than hidden |
 | `ANTHROPIC_API_KEY` | `--backend anthropic` | not needed for `claude-code` or `mock` |
+| `NEBIUS_API_KEY` | `--backend nebius` | Nebius Token Factory; runs NVIDIA Nemotron (Nano / Super / Ultra) |
 
 Nothing is read from the repository. Credentials come from the environment.
 
